@@ -126,6 +126,6 @@ export function parsePickQR(raw: string): PickQRResult | { error: string } {
 }
 
 // Force export to prevent tree-shaking
-export const _keepNormalizeDate = normalizeDate;
+
 export const _keepNormalizeCode = normalizeCode;
 
