@@ -186,8 +186,8 @@ export default function DispatchScreen() {
                 { label: 'Case Pack', value: dispatch.ref_case_pack ?? '—' },
                 { label: 'Total Schedule Bins', value: dispatch.total_schedule_bins ?? '—' },
                 { label: 'Schedule No', value: dispatch.ref_schedule_number ?? '—' },
-                { label: 'Supply Date', value: dispatch.ref_supply_date ?? '—' },
-                { label: 'Nagare Time', value: dispatch.ref_schedule_sent_date ?? '—' },
+                { label: 'Nagare Time', value: dispatch.ref_supply_date ?? '—' },
+                { label: 'Schedule Sent Date', value: dispatch.ref_schedule_sent_date ?? '—' },
               ].map(item => (
                 <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '4px' }}>{item.label}</div>
