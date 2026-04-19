@@ -61,7 +61,7 @@ export default function DispatchScreen() {
 
   useIdleTimer(() => {
     localStorage.removeItem('token');
-    window.location.href = '/login';
+    window.location.href = '/wms-frontend/#/login';
   }, 10 * 60 * 1000);
 
   const handleBinSubmit = async () => {
