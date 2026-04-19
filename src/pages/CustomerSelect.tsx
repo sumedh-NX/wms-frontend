@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-const API = import.meta.env.VITE_API_BASE;
-
 const KEYFRAMES = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
@@ -11,7 +9,7 @@ const KEYFRAMES = `
 `;
 
 export default function CustomerSelect() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<any[]>([]);
   const [selected, setSelected] = useState('');
@@ -19,13 +17,16 @@ export default function CustomerSelect() {
   const [continuing, setContinuing] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/customers`, { headers: { Authorization: `Bearer ${token}` } })
+    const token = localStorage.getItem('token');
+    fetch(`${import.meta.env.VITE_API_BASE}/customers`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(r => r.json())
       .then(data => {
         const list = Array.isArray(data) ? data : [];
         setCustomers(list);
         if (list.length === 1) setSelected(String(list[0].id));
-       })
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -65,7 +66,6 @@ export default function CustomerSelect() {
         <div style={grid} />
         <div style={orb} />
         <div style={card}>
-          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -79,7 +79,8 @@ export default function CustomerSelect() {
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.9px', textTransform: 'uppercase', marginTop: '1px' }}>WMS Outbound</div>
               </div>
             </div>
-            <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+            <button onClick={logout}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
               onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.10)')}
               onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
               Sign out
@@ -92,11 +93,10 @@ export default function CustomerSelect() {
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '14px', padding: '20px 0' }}>
               <div style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-              Loading customers…
+              Loading customers...
             </div>
           ) : (
             <>
-              {/* Customer cards */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
                 {customers.map(c => {
                   const isSelected = selected === String(c.id);
@@ -110,7 +110,6 @@ export default function CustomerSelect() {
                         transition: 'all 0.2s ease',
                         boxShadow: isSelected ? '0 0 0 3px rgba(120,190,32,0.12)' : 'none',
                       }}>
-                      {/* Avatar */}
                       <div style={{
                         width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
                         background: isSelected ? 'rgba(120,190,32,0.25)' : 'rgba(255,255,255,0.08)',
@@ -125,7 +124,6 @@ export default function CustomerSelect() {
                         <div style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.85)', fontSize: '14px', fontWeight: 600, transition: 'color 0.2s' }}>{c.name}</div>
                         <div style={{ color: isSelected ? 'rgba(120,190,32,0.8)' : 'rgba(255,255,255,0.35)', fontSize: '11.5px', letterSpacing: '0.5px', marginTop: '2px', transition: 'color 0.2s' }}>{c.code}</div>
                       </div>
-                      {/* Radio circle */}
                       <div style={{
                         width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
                         border: isSelected ? '5px solid #78BE20' : '1.5px solid rgba(255,255,255,0.25)',
@@ -147,9 +145,17 @@ export default function CustomerSelect() {
                   boxShadow: selected ? '0 4px 20px rgba(120,190,32,0.3)' : 'none',
                 }}>
                 {continuing ? (
-                  <><div style={{ width: '17px', height: '17px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Loading dispatches…</>
+                  <>
+                    <div style={{ width: '17px', height: '17px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    Loading dispatches...
+                  </>
                 ) : (
-                  <>Continue <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M9 4L13 8L9 12" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></>
+                  <>
+                    Continue
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 8H13M9 4L13 8L9 12" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </>
                 )}
               </button>
             </>
