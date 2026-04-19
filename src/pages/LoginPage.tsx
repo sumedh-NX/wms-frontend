@@ -283,7 +283,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [statusIdx, setStatusIdx] = useState(0);
 
-  const { login } = useAuth();
+  const { setUser } = useAuth();
   const navigate = useNavigate();
 
   // Cycle status messages while loading
@@ -305,10 +305,20 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Invalid email or password.');
+      localStorage.setItem('token', data.token);
+      const { jwtDecode } = await import('jwt-decode');
+      const decoded: any = jwtDecode(data.token);
+      setUser({ id: decoded.id, email: decoded.email, role: decoded.role });
       navigate('/select-customer');
     } catch (err: any) {
-      setError(err?.message || 'Invalid email or password.');
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
