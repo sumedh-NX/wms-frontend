@@ -32,8 +32,12 @@ export default function DispatchBoard() {
     fetch(`${import.meta.env.VITE_API_BASE}/dispatches?customerId=${customerId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Server error');
+        return r.json();
+      })
       .then(data => setDispatches(Array.isArray(data) ? data : []))
+      .catch(() => setTimeout(fetchDispatches, 3000)) // retry after 3s if cold start
       .finally(() => setLoading(false));
   };
 
