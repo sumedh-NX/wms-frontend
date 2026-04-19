@@ -47,12 +47,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-    setUser(null);
-    window.location.href = '/wms-frontend/#/login';
-  };
+ const logout = () => {
+  localStorage.removeItem('token');
+  delete axios.defaults.headers.common['Authorization'];
+  setUser(null);
+};
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, isLoading }}>
