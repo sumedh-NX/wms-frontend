@@ -159,15 +159,15 @@ export default function DispatchScreen() {
               Schedule No: <strong>{dispatch.ref_schedule_number}</strong>
             </Typography>
           )}
+         {dispatch.ref_supply_date && (
+          <Typography>
+            Supply Date: <strong>{dispatch.ref_supply_date}</strong>
+          </Typography>
+            )}
           {dispatch.ref_schedule_sent_date && (
-            <Typography>
-              Nagare Time: <strong>{dispatch.ref_schedule_sent_date}</strong>
-            </Typography>
-          )}
-          {dispatch.ref_supply_date && (
-            <Typography>
-              Supply Date: <strong>{dispatch.ref_supply_date}</strong>
-            </Typography>
+          <Typography>
+            Nagare Time: <strong>{dispatch.ref_schedule_sent_date}</strong>
+          </Typography>
           )}
       </Paper>
 
