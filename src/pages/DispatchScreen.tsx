@@ -3,16 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useIdleTimer } from '../hooks/useIdleTimer';
 import CameraScanner from '../components/CameraScanner';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import axios from 'axios';
 
 const KEYFRAMES = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 @keyframes spin { to{transform:rotate(360deg)} }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(0.95)} }
 @keyframes successPop { 0%{opacity:0;transform:scale(0.92)} 100%{opacity:1;transform:scale(1)} }
-@keyframes confetti { 0%{opacity:1;transform:translateY(0) rotate(0deg)} 100%{opacity:0;transform:translateY(-60px) rotate(360deg)} }
 `;
 
 type Dispatch = {
@@ -39,6 +36,7 @@ export default function DispatchScreen() {
   const [pickInput, setPickInput] = useState('');
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [showBin, setShowBin] = useState(true);
+  const [completing, setCompleting] = useState(false);
 
   const isComplete = dispatch
     ? dispatch.smg_qty === dispatch.total_schedule_bins &&
@@ -58,6 +56,13 @@ export default function DispatchScreen() {
   };
 
   useEffect(() => { loadDispatch(); }, [id]);
+
+  // Auto-complete when all bins and picks are scanned
+  useEffect(() => {
+    if (isComplete && dispatch?.status !== 'COMPLETED') {
+      handleComplete();
+    }
+  }, [isComplete]);
 
   useIdleTimer(() => {
     localStorage.removeItem('token');
@@ -93,22 +98,80 @@ export default function DispatchScreen() {
   };
 
   const handleComplete = async () => {
-    await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/complete`);
-    loadDispatch();
+    if (completing) return;
+    setCompleting(true);
+    try {
+      await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/complete`);
+      await loadDispatch();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCompleting(false);
+    }
   };
 
-  const exportPDF = async () => {
-    const element = document.getElementById('pdf-content')!;
-    const canvas = await html2canvas(element);
-    const imgData = canvas.toDataURL('image/png');
+  const exportPDF = () => {
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    const W = pdf.internal.pageSize.getWidth();
+
+    // Header bar
+    pdf.setFillColor(27, 27, 75);
+    pdf.rect(0, 0, W, 32, 'F');
+    pdf.setTextColor(120, 190, 32);
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('NX Logistics - WMS Outbound', 14, 13);
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(11);
+    pdf.text(`Dispatch Report - #${dispatch?.dispatch_number}`, 14, 24);
+
+    // Divider
+    pdf.setDrawColor(120, 190, 32);
+    pdf.setLineWidth(0.5);
+    pdf.line(10, 35, W - 10, 35);
+
+    // Data rows
+    pdf.setFontSize(11);
+    const rows = [
+      ['Product Code', dispatch?.ref_product_code ?? '—'],
+      ['Case Pack', String(dispatch?.ref_case_pack ?? '—')],
+      ['Schedule Number', dispatch?.ref_schedule_number ?? '—'],
+      ['Supply Date', dispatch?.ref_supply_date ?? '—'],
+      ['Nagare Time', dispatch?.ref_schedule_sent_date ?? '—'],
+      ['Total Schedule Bins', String(dispatch?.total_schedule_bins ?? '—')],
+      ['SMG Qty (Bins Scanned)', String(dispatch?.smg_qty ?? '—')],
+      ['Bin Qty (Picks Scanned)', String(dispatch?.bin_qty ?? '—')],
+      ['Status', dispatch?.status ?? '—'],
+    ];
+
+    let y = 46;
+    rows.forEach(([label, value], i) => {
+      if (i % 2 === 0) {
+        pdf.setFillColor(245, 247, 250);
+        pdf.rect(10, y - 5, W - 20, 10, 'F');
+      }
+      pdf.setTextColor(80, 80, 100);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(label + ':', 14, y);
+      pdf.setTextColor(30, 30, 50);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(String(value), 95, y);
+      y += 13;
+    });
+
+    // Footer
+    pdf.setDrawColor(200, 200, 210);
+    pdf.setLineWidth(0.3);
+    pdf.line(10, 278, W - 10, 278);
+    pdf.setFontSize(8);
+    pdf.setTextColor(150, 150, 160);
+    pdf.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 14, 284);
+    pdf.text('Nippon Express India - WMS Outbound', W - 14, 284, { align: 'right' });
+
     pdf.save(`dispatch_${dispatch?.dispatch_number}.pdf`);
   };
 
+  // Styles
   const page: React.CSSProperties = {
     minHeight: '100vh',
     background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)',
@@ -178,20 +241,20 @@ export default function DispatchScreen() {
 
         <div style={content}>
 
-          {/* Dispatch info card */}
+          {/* Dispatch info grid */}
           <div style={{ ...card, animation: 'fadeUp 0.4s ease both' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
               {[
                 { label: 'Product Code', value: dispatch.ref_product_code ?? '—' },
                 { label: 'Case Pack', value: dispatch.ref_case_pack ?? '—' },
                 { label: 'Total Schedule Bins', value: dispatch.total_schedule_bins ?? '—' },
                 { label: 'Schedule No', value: dispatch.ref_schedule_number ?? '—' },
-                { label: 'Nagare Time', value: dispatch.ref_supply_date ?? '—' },
-                { label: 'Schedule Sent Date', value: dispatch.ref_schedule_sent_date ?? '—' },
+                { label: 'Supply Date', value: dispatch.ref_supply_date ?? '—' },
+                { label: 'Nagare Time', value: dispatch.ref_schedule_sent_date ?? '—' },
               ].map(item => (
                 <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '4px' }}>{item.label}</div>
-                  <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{String(item.value)}</div>
+                  <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>{String(item.value)}</div>
                 </div>
               ))}
             </div>
@@ -200,10 +263,10 @@ export default function DispatchScreen() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Scan Progress</span>
-                <span style={{ color: '#78BE20', fontSize: '12px', fontWeight: 700 }}>{dispatch.smg_qty}/{dispatch.total_schedule_bins} bins</span>
+                <span style={{ color: '#78BE20', fontSize: '12px', fontWeight: 700 }}>{dispatch.smg_qty}/{dispatch.total_schedule_bins} bins · {progress}%</span>
               </div>
               <div style={{ height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg,#78BE20,#aee860)', borderRadius: '6px', transition: 'width 0.4s ease' }} />
+                <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg,#78BE20,#aee860)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                 <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>SMG Qty: <strong style={{ color: '#e8a800' }}>{dispatch.smg_qty}</strong></span>
@@ -228,59 +291,53 @@ export default function DispatchScreen() {
                 }
               </div>
               <span style={{ color: message.type === 'success' ? '#78BE20' : '#ff7070', fontSize: '13px', fontWeight: 500 }}>{message.text}</span>
-              <button onClick={() => setMessage(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px', padding: 0 }}>×</button>
+              <button onClick={() => setMessage(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '18px', padding: 0, lineHeight: 1 }}>×</button>
             </div>
           )}
 
-          {/* SUCCESS BANNER — shown when all bins and picks are scanned */}
-          {isComplete ? (
+          {/* SUCCESS BANNER */}
+          {(isComplete || dispatch.status === 'COMPLETED') ? (
             <div style={{ animation: 'successPop 0.5s ease both' }}>
               <div style={{
-                background: 'linear-gradient(135deg,rgba(120,190,32,0.18),rgba(120,190,32,0.08))',
+                background: 'linear-gradient(135deg,rgba(120,190,32,0.18),rgba(120,190,32,0.06))',
                 border: '1px solid rgba(120,190,32,0.4)',
-                borderRadius: '16px', padding: '28px 24px', textAlign: 'center', marginBottom: '16px',
+                borderRadius: '16px', padding: '32px 24px', textAlign: 'center', marginBottom: '16px',
               }}>
-                {/* Big checkmark */}
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(120,190,32,0.4)' }}>
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                    <path d="M6 16L13 23L26 9" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                {/* Checkmark */}
+                <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 28px rgba(120,190,32,0.45)' }}>
+                  <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                    <path d="M7 17L14 24L27 10" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <div style={{ color: '#78BE20', fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>Batch Complete!</div>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '24px' }}>All bins and picks have been scanned successfully</div>
+
+                <div style={{ color: '#78BE20', fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px', marginBottom: '6px' }}>
+                  {completing ? 'Completing...' : 'Batch Complete!'}
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '28px' }}>
+                  All bins and picks scanned successfully
+                </div>
 
                 {/* Summary stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '24px' }}>
                   {[
-                    { label: 'Schedule Bins', value: dispatch.total_schedule_bins, color: '#fff' },
-                    { label: 'SMG Qty', value: dispatch.smg_qty, color: '#e8a800' },
-                    { label: 'Bin Qty', value: dispatch.bin_qty, color: '#78BE20' },
+                    { label: 'Schedule Bins', value: dispatch.total_schedule_bins, color: '#fff', bg: 'rgba(255,255,255,0.08)' },
+                    { label: 'SMG Qty', value: dispatch.smg_qty, color: '#e8a800', bg: 'rgba(255,185,0,0.10)' },
+                    { label: 'Bin Qty', value: dispatch.bin_qty, color: '#78BE20', bg: 'rgba(120,190,32,0.12)' },
                   ].map(s => (
-                    <div key={s.label} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px 10px' }}>
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>{s.label}</div>
-                      <div style={{ color: s.color, fontSize: '28px', fontWeight: 700, letterSpacing: '-1px' }}>{s.value}</div>
+                    <div key={s.label} style={{ background: s.bg, borderRadius: '12px', padding: '16px 10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '8px' }}>{s.label}</div>
+                      <div style={{ color: s.color, fontSize: '30px', fontWeight: 700, letterSpacing: '-1px' }}>{s.value}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Action buttons */}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  {dispatch.status !== 'COMPLETED' && (
-                    <button onClick={handleComplete}
-                      style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#78BE20,#5ea318)', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(120,190,32,0.3)' }}>
-                      ✓ Complete Dispatch
-                    </button>
-                  )}
-                  {dispatch.status === 'COMPLETED' && (
-                    <>
-                      <div style={{ color: 'rgba(120,190,32,0.8)', fontSize: '13px', fontWeight: 500, padding: '12px 0' }}>✓ Dispatch Completed</div>
-                      <button onClick={exportPDF}
-                        style={{ padding: '12px 20px', borderRadius: '10px', border: '1px solid rgba(120,190,32,0.4)', background: 'transparent', color: '#78BE20', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        Export PDF
-                      </button>
-                    </>
-                  )}
-                </div>
+                {/* Export PDF button */}
+                <button onClick={exportPDF}
+                  style={{ padding: '12px 32px', borderRadius: '10px', border: '1px solid rgba(120,190,32,0.5)', background: 'rgba(120,190,32,0.12)', color: '#78BE20', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+                  onMouseOver={e => (e.currentTarget.style.background = 'rgba(120,190,32,0.22)')}
+                  onMouseOut={e => (e.currentTarget.style.background = 'rgba(120,190,32,0.12)')}>
+                  ↓ Export PDF Report
+                </button>
               </div>
             </div>
           ) : (
@@ -288,21 +345,21 @@ export default function DispatchScreen() {
               {/* Bin scan input */}
               {showBin && (
                 <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(232,168,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(232,168,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                         <rect x="3" y="3" width="7" height="7" rx="1" stroke="#e8a800" strokeWidth="1.8"/>
                         <rect x="14" y="3" width="7" height="7" rx="1" stroke="#e8a800" strokeWidth="1.8"/>
                         <rect x="3" y="14" width="7" height="7" rx="1" stroke="#e8a800" strokeWidth="1.8"/>
                         <path d="M14 14h2M18 14h3M14 18v2M14 21h2M18 18h3M18 21v-1" stroke="#e8a800" strokeWidth="1.8" strokeLinecap="round"/>
                       </svg>
                     </div>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>Scan Bin Label</div>
-                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 1 of 2</div>
+                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 1 of 2 · Scan the bin label QR code</div>
                     </div>
-                    <div style={{ marginLeft: 'auto', background: 'rgba(232,168,0,0.12)', border: '1px solid rgba(232,168,0,0.25)', borderRadius: '20px', padding: '3px 10px', color: '#e8a800', fontSize: '11px', fontWeight: 600 }}>
-                      {dispatch.smg_qty}/{dispatch.total_schedule_bins} scanned
+                    <div style={{ background: 'rgba(232,168,0,0.12)', border: '1px solid rgba(232,168,0,0.25)', borderRadius: '20px', padding: '3px 12px', color: '#e8a800', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>
+                      {dispatch.smg_qty}/{dispatch.total_schedule_bins}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
@@ -313,11 +370,13 @@ export default function DispatchScreen() {
                       value={binInput}
                       onChange={e => setBinInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleBinSubmit()}
-                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit' }}
+                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit', transition: 'border 0.2s' }}
+                      onFocus={e => e.currentTarget.style.border = '1px solid rgba(120,190,32,0.6)'}
+                      onBlur={e => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'}
                     />
                     {binInput && (
                       <button onClick={() => setBinInput('')}
-                        style={{ padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                        style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>
                         ✕
                       </button>
                     )}
@@ -329,20 +388,20 @@ export default function DispatchScreen() {
               {/* Pick scan input */}
               {!showBin && (
                 <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(120,190,32,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(120,190,32,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="#78BE20" strokeWidth="1.8" strokeLinecap="round"/>
                         <rect x="9" y="3" width="6" height="4" rx="1" stroke="#78BE20" strokeWidth="1.8"/>
                         <path d="M9 12l2 2 4-4" stroke="#78BE20" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>Scan Pick-list</div>
-                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 2 of 2</div>
+                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 2 of 2 · Scan the pick-list QR code</div>
                     </div>
-                    <div style={{ marginLeft: 'auto', background: 'rgba(120,190,32,0.12)', border: '1px solid rgba(120,190,32,0.25)', borderRadius: '20px', padding: '3px 10px', color: '#78BE20', fontSize: '11px', fontWeight: 600 }}>
-                      {dispatch.bin_qty}/{dispatch.total_schedule_bins} picked
+                    <div style={{ background: 'rgba(120,190,32,0.12)', border: '1px solid rgba(120,190,32,0.25)', borderRadius: '20px', padding: '3px 12px', color: '#78BE20', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>
+                      {dispatch.bin_qty}/{dispatch.total_schedule_bins}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
@@ -353,11 +412,13 @@ export default function DispatchScreen() {
                       value={pickInput}
                       onChange={e => setPickInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handlePickSubmit()}
-                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit' }}
+                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit', transition: 'border 0.2s' }}
+                      onFocus={e => e.currentTarget.style.border = '1px solid rgba(120,190,32,0.6)'}
+                      onBlur={e => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'}
                     />
                     {pickInput && (
                       <button onClick={() => setPickInput('')}
-                        style={{ padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                        style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>
                         ✕
                       </button>
                     )}
@@ -367,19 +428,6 @@ export default function DispatchScreen() {
               )}
             </>
           )}
-        </div>
-
-        {/* Hidden PDF content */}
-        <div id="pdf-content" style={{ display: 'none' }}>
-          <h1>Dispatch #{dispatch.dispatch_number}</h1>
-          <p>Product Code: {dispatch.ref_product_code}</p>
-          <p>Case Pack: {dispatch.ref_case_pack}</p>
-          <p>Schedule No: {dispatch.ref_schedule_number}</p>
-          <p>Supply Date: {dispatch.ref_supply_date}</p>
-          <p>Nagare Time: {dispatch.ref_schedule_sent_date}</p>
-          <p>Total Schedule Bins: {dispatch.total_schedule_bins}</p>
-          <p>SMG Qty: {dispatch.smg_qty}</p>
-          <p>Bin Qty: {dispatch.bin_qty}</p>
         </div>
       </div>
     </>
