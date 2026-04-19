@@ -136,8 +136,8 @@ export default function DispatchScreen() {
       ['Product Code', dispatch?.ref_product_code ?? '—'],
       ['Case Pack', String(dispatch?.ref_case_pack ?? '—')],
       ['Schedule Number', dispatch?.ref_schedule_number ?? '—'],
-      ['Supply Date', dispatch?.ref_supply_date ?? '—'],
-      ['Nagare Time', dispatch?.ref_schedule_sent_date ?? '—'],
+      ['Nagare Time', dispatch?.ref_supply_date ?? '—'],
+      ['Scheduled Sent Date', dispatch?.ref_schedule_sent_date ?? '—'],
       ['Total Schedule Bins', String(dispatch?.total_schedule_bins ?? '—')],
       ['SMG Qty (Bins Scanned)', String(dispatch?.smg_qty ?? '—')],
       ['Bin Qty (Picks Scanned)', String(dispatch?.bin_qty ?? '—')],
@@ -249,8 +249,8 @@ export default function DispatchScreen() {
                 { label: 'Case Pack', value: dispatch.ref_case_pack ?? '—' },
                 { label: 'Total Schedule Bins', value: dispatch.total_schedule_bins ?? '—' },
                 { label: 'Schedule No', value: dispatch.ref_schedule_number ?? '—' },
-                { label: 'Supply Date', value: dispatch.ref_supply_date ?? '—' },
-                { label: 'Nagare Time', value: dispatch.ref_schedule_sent_date ?? '—' },
+                { label: 'Nagare Time', value: dispatch.ref_supply_date ?? '—' },
+                { label: 'Scheduled Sent Date', value: dispatch.ref_schedule_sent_date ?? '—' },
               ].map(item => (
                 <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '4px' }}>{item.label}</div>
