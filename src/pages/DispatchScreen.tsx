@@ -46,7 +46,7 @@ export default function DispatchScreen() {
   // Fetch dispatch data (includes already‑scanned bins/picks)
   const loadDispatch = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatches/${id}`);
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatch/${id}`);
       setDispatch(res.data.dispatch);
     } catch (e) {
       console.error(e);
@@ -71,7 +71,7 @@ export default function DispatchScreen() {
   const handleBinSubmit = async () => {
     if (!binInput.trim()) return;
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatches/${id}/scan-bin`, {
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin`, {
         rawQr: binInput.trim(),
       });
       setDispatch(res.data);
@@ -90,7 +90,7 @@ export default function DispatchScreen() {
   const handlePickSubmit = async () => {
     if (!pickInput.trim()) return;
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatches/${id}/scan-pick`, {
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-pick`, {
         rawQr: pickInput.trim(),
       });
       setDispatch(res.data);
@@ -107,7 +107,7 @@ export default function DispatchScreen() {
   // -------------------------------------------------------------
   // Complete dispatch
   const handleComplete = async () => {
-    await axios.post(`${import.meta.env.VITE_API_BASE}/dispatches/${id}/complete`);
+    await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/complete`);
     navigate('/dispatches');
   };
 
