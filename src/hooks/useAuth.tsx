@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
-    window.location.href = '/login';
+    window.location.href = '/wms-frontend/#/login';
   };
 
   return (
