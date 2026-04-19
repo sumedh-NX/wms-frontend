@@ -21,7 +21,11 @@ export default function CustomerSelect() {
   useEffect(() => {
     fetch(`${API}/customers`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(data => { setCustomers(data); if (data.length === 1) setSelected(String(data[0].id)); })
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        setCustomers(list);
+        if (list.length === 1) setSelected(String(list[0].id));
+       })
       .finally(() => setLoading(false));
   }, []);
 
