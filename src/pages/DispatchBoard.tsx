@@ -53,7 +53,7 @@ export default function DispatchBoard() {
         body: JSON.stringify({ customerId }),
       });
       const data = await r.json();
-      navigate(`/dispatches/${data.id}?customerId=${customerId}`);
+      navigate(`/dispatch/${data.id}?customerId=${customerId}`);
     } catch (e) {
       console.error(e);
     } finally {
@@ -196,7 +196,7 @@ export default function DispatchBoard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map((d, i) => (
                 <div key={d.id}
-                  onClick={() => navigate(`/dispatches/${d.id}?customerId=${customerId}`)}
+                  onClick={() => navigate(`/dispatch/${d.id}?customerId=${customerId}`)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '16px',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
