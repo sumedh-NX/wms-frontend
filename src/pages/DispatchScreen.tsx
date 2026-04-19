@@ -161,12 +161,12 @@ export default function DispatchScreen() {
           )}
          {dispatch.ref_supply_date && (
           <Typography>
-            Supply Date: <strong>{dispatch.ref_supply_date}</strong>
+            Nagare Time: <strong>{dispatch.ref_supply_date}</strong>
           </Typography>
             )}
           {dispatch.ref_schedule_sent_date && (
           <Typography>
-            Nagare Time: <strong>{dispatch.ref_schedule_sent_date}</strong>
+            Schedule Sent Dt: <strong>{dispatch.ref_schedule_sent_date}</strong>
           </Typography>
           )}
       </Paper>
