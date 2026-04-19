@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-const API = import.meta.env.VITE_API_BASE;
-
 const KEYFRAMES = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
@@ -18,7 +16,7 @@ function formatDate(iso: string) {
 }
 
 export default function DispatchBoard() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const customerId = params.get('customerId');
@@ -29,18 +27,22 @@ export default function DispatchBoard() {
   const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
 
   const fetchDispatches = () => {
+    const token = localStorage.getItem('token');
     setLoading(true);
-    fetch(`${API}/dispatches?customerId=${customerId}`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${import.meta.env.VITE_API_BASE}/dispatches?customerId=${customerId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(r => r.json())
-      .then(setDispatches)
+      .then(data => setDispatches(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchDispatches(); }, []);
 
   const handleNew = async () => {
+    const token = localStorage.getItem('token');
     setCreating(true);
-    const r = await fetch(`${API}/dispatches`, {
+    const r = await fetch(`${import.meta.env.VITE_API_BASE}/dispatches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ customerId }),
@@ -54,7 +56,6 @@ export default function DispatchBoard() {
   const inProgressCount = dispatches.filter(d => d.status === 'IN_PROGRESS').length;
   const completedCount = dispatches.filter(d => d.status === 'COMPLETED').length;
 
-  // Styles
   const page: React.CSSProperties = {
     minHeight: '100vh',
     background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)',
@@ -85,12 +86,12 @@ export default function DispatchBoard() {
   });
 
   const filterBtn = (val: typeof filter): React.CSSProperties => ({
-    padding: '6px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
-    fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 600, transition: 'all 0.18s',
-    background: filter === val ? 'rgba(120,190,32,0.18)' : 'transparent',
-    color: filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
-    border: filter === val ? '1px solid rgba(120,190,32,0.35)' : '1px solid transparent',
-  });
+  padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 600, transition: 'all 0.18s',
+  background: filter === val ? 'rgba(120,190,32,0.18)' : 'transparent',
+  color: filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
+  border: filter === val ? '1px solid rgba(120,190,32,0.35)' : '1px solid transparent',
+});
 
   return (
     <>
@@ -142,7 +143,7 @@ export default function DispatchBoard() {
                 flexShrink: 0,
               }}>
               {creating
-                ? <><div style={{ width: '15px', height: '15px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Creating…</>
+                ? <><div style={{ width: '15px', height: '15px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Creating...</>
                 : <><span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> New Dispatch</>
               }
             </button>
@@ -175,7 +176,7 @@ export default function DispatchBoard() {
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.4)', fontSize: '14px', padding: '40px 0', justifyContent: 'center' }}>
               <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-              Loading dispatches…
+              Loading dispatches...
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>
@@ -204,7 +205,6 @@ export default function DispatchBoard() {
                     (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.08)';
                     (e.currentTarget as HTMLDivElement).style.transform = 'translateX(0)';
                   }}>
-                  {/* Dispatch number circle */}
                   <div style={{
                     width: '44px', height: '44px', borderRadius: '10px', flexShrink: 0,
                     background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.15)' : 'rgba(255,185,0,0.12)',
@@ -214,8 +214,6 @@ export default function DispatchBoard() {
                   }}>
                     #{d.dispatch_number}
                   </div>
-
-                  {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '3px' }}>
                       Dispatch #{d.dispatch_number}
@@ -224,14 +222,10 @@ export default function DispatchBoard() {
                       {formatDate(d.created_at)}
                     </div>
                   </div>
-
-                  {/* Status badge */}
                   <div style={statusBadge(d.status)}>
                     <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: d.status === 'COMPLETED' ? '#78BE20' : '#e8a800', flexShrink: 0 }} />
                     {d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}
                   </div>
-
-                  {/* Chevron */}
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.3 }}>
                     <path d="M6 4L10 8L6 12" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
