@@ -23,6 +23,8 @@ type Dispatch = {
   total_schedule_bins: number;
   smg_qty: number;
   bin_qty: number;
+  status?: string;
+  supply_quantity?: number;
   ref_product_code?: string;
   ref_case_pack?: number;
   ref_supply_date?: string;
@@ -44,7 +46,7 @@ export default function DispatchScreen() {
   // Fetch dispatch data (includes already‑scanned bins/picks)
   const loadDispatch = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatch/${id}`);
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatches/${id}`);
       setDispatch(res.data.dispatch);
     } catch (e) {
       console.error(e);
@@ -69,7 +71,7 @@ export default function DispatchScreen() {
   const handleBinSubmit = async () => {
     if (!binInput.trim()) return;
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin`, {
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatches/${id}/scan-bin`, {
         rawQr: binInput.trim(),
       });
       setDispatch(res.data);
@@ -88,7 +90,7 @@ export default function DispatchScreen() {
   const handlePickSubmit = async () => {
     if (!pickInput.trim()) return;
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-pick`, {
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatches/${id}/scan-pick`, {
         rawQr: pickInput.trim(),
       });
       setDispatch(res.data);
@@ -105,7 +107,7 @@ export default function DispatchScreen() {
   // -------------------------------------------------------------
   // Complete dispatch
   const handleComplete = async () => {
-    await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/complete`);
+    await axios.post(`${import.meta.env.VITE_API_BASE}/dispatches/${id}/complete`);
     navigate('/dispatches');
   };
 
