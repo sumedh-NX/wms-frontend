@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -29,7 +29,7 @@ export default function DispatchBoard() {
   const fetchDispatches = () => {
     const token = localStorage.getItem('token');
     setLoading(true);
-    fetch(`${import.meta.env.VITE_API_BASE}/dispatches?customerId=${customerId}`, {
+    fetch(`${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(r => {
@@ -37,7 +37,7 @@ export default function DispatchBoard() {
         return r.json();
       })
       .then(data => setDispatches(Array.isArray(data) ? data : []))
-      .catch(() => setTimeout(fetchDispatches, 3000)) // retry after 3s if cold start
+      .catch(() => setDispatches([]))
       .finally(() => setLoading(false));
   };
 
@@ -46,14 +46,19 @@ export default function DispatchBoard() {
   const handleNew = async () => {
     const token = localStorage.getItem('token');
     setCreating(true);
-    const r = await fetch(`${import.meta.env.VITE_API_BASE}/dispatches`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ customerId }),
-    });
-    const data = await r.json();
-    setCreating(false);
-    navigate(`/dispatches/${data.id}?customerId=${customerId}`);
+    try {
+      const r = await fetch(`${import.meta.env.VITE_API_BASE}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ customerId }),
+      });
+      const data = await r.json();
+      navigate(`/dispatches/${data.id}?customerId=${customerId}`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const filtered = dispatches.filter(d => filter === 'ALL' || d.status === filter);
@@ -90,12 +95,12 @@ export default function DispatchBoard() {
   });
 
   const filterBtn = (val: typeof filter): React.CSSProperties => ({
-  padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
-  fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 600, transition: 'all 0.18s',
-  background: filter === val ? 'rgba(120,190,32,0.18)' : 'transparent',
-  color: filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
-  border: filter === val ? '1px solid rgba(120,190,32,0.35)' : '1px solid transparent',
-});
+    padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
+    fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 600, transition: 'all 0.18s',
+    background: filter === val ? 'rgba(120,190,32,0.18)' : 'transparent',
+    color: filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
+    border: filter === val ? '1px solid rgba(120,190,32,0.35)' : '1px solid transparent',
+  });
 
   return (
     <>
