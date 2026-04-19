@@ -313,6 +313,9 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Invalid email or password.');
       localStorage.setItem('token', data.token);
+      // Set axios default header so subsequent API calls are authenticated
+      const axios = (await import('axios')).default;
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       const { jwtDecode } = await import('jwt-decode');
       const decoded: any = jwtDecode(data.token);
       setUser({ id: decoded.id, email: decoded.email, role: decoded.role });
