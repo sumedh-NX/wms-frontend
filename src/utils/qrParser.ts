@@ -1,131 +1,109 @@
-// src/utils/qrParser.ts
+/**
+ * qrParser.ts — Frontend QR parser (mirrors backend qrParser.js exactly)
+ * Handles both single-line (spaces) and multi-line (newlines) bin label QR codes.
+ */
 
 export interface BinQRResult {
   binNumber: string;
   productCode: string;
   casePack: number;
-  productName: string;
-  scheduleSentDate: string;
-  invoiceNumber: string;
+  totalBins: number;
   supplyQty: number;
-  vendorCode: string;
-  scheduleNumber: string;
-  unloadLoc: string;
-  supplyDate: string;
-  raw: string;
+  scheduleSentDate: string; // DD/MM/YY  — Supply Date label
+  invoiceNumber: string;
+  vendorCode: string | null;
+  scheduleNumber: string | null;
+  unloadLocation: string | null;
+  supplyDate: string | null; // DD/MM/YYYY HH:MM AM/PM — Nagare Time label
 }
 
 export interface PickQRResult {
-  pickCode: string;
   productCode: string;
-  casePack: number | null;
-  raw: string;
 }
 
-/**
- * Normalizes product codes for comparison.
- */
-
-
-/**
- * Normalizes various date formats to YYYY-MM-DD for database comparison.
- * This MUST be identical to the backend version.
- */
-
-export function parseBinQR(raw: string): BinQRResult | { error: string } {
+export function parseBinQR(raw: string): BinQRResult | null {
   try {
-    const t = raw.trim();
+    // Normalize: collapse all whitespace (newlines, tabs, multiple spaces) → single space
+    const t = raw.trim().replace(/\s+/g, ' ');
+
+    // 1. Bin number — first 13 digits
     const binMatch = t.match(/^(\d{13})/);
-    const codeMatch = t.match(/\s{2,}([A-Z0-9]{8,15})\s/i);
-    const cpMatch = t.match(/\s([A-Z0-9]{8,15})\s+(\d{2,4})\s/i);
-    const nameMatch = t.match(/\s\d{2,4}\s{2,}([A-Z0-9,\/\s]+?)\d{13}/i);
-    const dateBlock = t.match(/(\d{2}\/\d{2}\/\d{2,4})\s*(\d{8})\s*(\d{2,4})\s*N/);
+    if (!binMatch) throw new Error('No bin number found');
+    const binNumber = binMatch[1];
+
+    // 2. Product code — first token after bin number (8–15 alphanumeric chars)
+    const afterBin = t.replace(/^\d{13}\s*/, '');
+    const codeMatch = afterBin.match(/^([A-Z0-9]{8,15})\s/i);
+    if (!codeMatch) throw new Error('No product code found');
+    const productCode = codeMatch[1];
+
+    // 3. Case pack — second token after bin number (2–4 digits)
+    const cpMatch = afterBin.match(/^[A-Z0-9]{8,15}\s+(\d{2,4})\s/i);
+    if (!cpMatch) throw new Error('No case pack found');
+    const casePack = parseInt(cpMatch[1]);
+
+    // 4. Date block — anchored to the SECOND occurrence of the 13-digit bin number
+    //    Use \s* to handle both formats (space-separated or merged)
+    const dateBlock = t.match(
+      new RegExp(binNumber + '\\s*(\\d{2}\\/\\d{2}\\/\\d{2})\\s*(\\d{8})\\s*(\\d{2,4})\\s*N')
+    );
+    if (!dateBlock) throw new Error('No date block found');
+    const scheduleSentDate = dateBlock[1]; // DD/MM/YY
+    const invoiceNumber    = dateBlock[2];
+    const supplyQty        = parseInt(dateBlock[3]);
+
+    // 5. Validate
+    if (supplyQty % casePack !== 0) {
+      throw new Error(`Supply qty ${supplyQty} not divisible by case pack ${casePack}`);
+    }
+    const totalBins = supplyQty / casePack;
+
+    // 6. Vendor code
     const vcMatch = t.match(/N(\d{3})/);
+    const vendorCode = vcMatch ? vcMatch[1] : null;
+
+    // 7. Schedule number
     const snMatch = t.match(/N\d{3}\s*([0-9A-Z]{10,20})\s*(?=[A-Z]{2}-)/i);
+    const scheduleNumber = snMatch ? snMatch[1] : null;
+
+    // 8. Unload location
     const ulMatch = t.match(/([A-Z]{2}-\d+)/i);
+    const unloadLocation = ulMatch ? ulMatch[1] : null;
+
+    // 9. Supply date (full datetime)
     const sdMatch = t.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}(?:\s*[AP]M)?)/i);
-
-    if (!binMatch || !codeMatch || !cpMatch) {
-      throw new Error('Cannot parse Bin Label QR. Check format.');
-    }
-
-    const parsedCasePack = parseInt(cpMatch[2], 10);
-    if (isNaN(parsedCasePack) || parsedCasePack <= 0) {
-      throw new Error(`Invalid Case Pack: ${cpMatch[2]}`);
-    }
-
-    if (!dateBlock) {
-      throw new Error('Supply Quantity block not found.');
-    }
-
-    const parsedSupplyQty = parseInt(dateBlock[3], 10);
-    if (isNaN(parsedSupplyQty) || parsedSupplyQty <= 0) {
-      throw new Error(`Invalid Supply Qty: ${dateBlock[3]}`);
-    }
-
-    if (parsedSupplyQty % parsedCasePack !== 0) {
-      throw new Error(`Supply Qty (${parsedSupplyQty}) is not divisible by Case Pack (${parsedCasePack}).`);
-    }
+    const supplyDate = sdMatch ? sdMatch[1] : null;
 
     return {
-      binNumber: binMatch[1].trim(),
-      productCode: codeMatch[1].trim(),
-      casePack: parsedCasePack,
-      productName: nameMatch ? nameMatch[1].trim() : '',
-      scheduleSentDate: dateBlock ? dateBlock[1].trim() : '',
-      invoiceNumber: dateBlock ? dateBlock[2].trim() : '',
-      supplyQty: parsedSupplyQty,
-      vendorCode: vcMatch ? vcMatch[1].trim() : '',
-      scheduleNumber: snMatch ? snMatch[1].trim() : '',
-      unloadLoc: ulMatch ? ulMatch[1].trim() : '',
-      supplyDate: sdMatch ? sdMatch[1].trim() : '',
-      raw: raw
+      binNumber,
+      productCode,
+      casePack,
+      totalBins,
+      supplyQty,
+      scheduleSentDate,
+      invoiceNumber,
+      vendorCode,
+      scheduleNumber,
+      unloadLocation,
+      supplyDate,
     };
-  } catch (e: any) {
-    return { error: e.message };
+  } catch {
+    return null;
   }
 }
 
-export function parsePickQR(raw: string): PickQRResult | { error: string } {
+export function normalizeCode(code: string): string {
+  if (!code) return '';
+  return code.toUpperCase().replace(/-/g, '').replace(/^M/, '');
+}
+
+export function parsePickQR(raw: string): PickQRResult | null {
   try {
-    const t = raw.trim();
-    const pickMatch = t.match(/^(G\d+)/);
-    const tokens = t.split(/\s+/).filter(s => s.length > 0);
-
-    let productCode = null;
-    for (let i = 1; i < tokens.length; i++) {
-      const token = tokens[i];
-      const noHyphen = token.replace(/-/g, '');
-      if (/^[A-Z0-9-]{8,16}$/i.test(token) && /[A-Z]/i.test(noHyphen) && /[0-9]/.test(noHyphen)) {
-        productCode = token;
-        break;
-      }
-    }
-
-    let casePack = null;
-    for (let i = 0; i < tokens.length; i++) {
-      if (/^\d{2,4}$/.test(tokens[i])) {
-        casePack = parseInt(tokens[i], 10);
-        break;
-      }
-    }
-
-    if (!pickMatch || !productCode) {
-      throw new Error('Picklist QR parse error: PickCode or ProductCode not found.');
-    }
-
-    return {
-      pickCode: pickMatch[1].trim(),
-      productCode: productCode.trim(),
-      casePack: casePack,
-      raw: raw
-    };
-  } catch (e: any) {
-    return { error: e.message };
+    const t = raw.trim().replace(/\s+/g, ' ');
+    const codeMatch = t.match(/([A-Z0-9]{8,15})/i);
+    if (!codeMatch) return null;
+    return { productCode: codeMatch[1] };
+  } catch {
+    return null;
   }
 }
-
-// Force export to prevent tree-shaking
-
-export const _keepNormalizeCode = normalizeCode;
-

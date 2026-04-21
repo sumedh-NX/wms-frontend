@@ -35,8 +35,12 @@ export default function DispatchScreen() {
   const [binInput, setBinInput] = useState('');
   const [pickInput, setPickInput] = useState('');
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
-  const [showBin, setShowBin] = useState(true);
   const [completing, setCompleting] = useState(false);
+
+  // Derived from server data — persists correctly when navigating away and back
+  // If smg_qty > bin_qty → a bin was scanned but pick not yet done → show PICK
+  // If smg_qty === bin_qty → show BIN input for next pair
+  const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
 
   const isComplete = dispatch
     ? dispatch.smg_qty === dispatch.total_schedule_bins &&
@@ -76,7 +80,6 @@ export default function DispatchScreen() {
       setDispatch(res.data);
       setMessage({ type: 'success', text: 'Bin accepted' });
       setBinInput('');
-      setShowBin(false);
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Bin scan failed' });
       setBinInput('');
@@ -90,7 +93,6 @@ export default function DispatchScreen() {
       setDispatch(res.data);
       setMessage({ type: 'success', text: 'Pick accepted' });
       setPickInput('');
-      setShowBin(true);
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Pick scan failed' });
       setPickInput('');
@@ -114,7 +116,7 @@ export default function DispatchScreen() {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const W = pdf.internal.pageSize.getWidth();
 
-    // Header bar
+    // Header
     pdf.setFillColor(27, 27, 75);
     pdf.rect(0, 0, W, 32, 'F');
     pdf.setTextColor(120, 190, 32);
@@ -131,17 +133,16 @@ export default function DispatchScreen() {
     pdf.line(10, 35, W - 10, 35);
 
     // Data rows
-    pdf.setFontSize(11);
-    const rows = [
-      ['Product Code', dispatch?.ref_product_code ?? '—'],
-      ['Case Pack', String(dispatch?.ref_case_pack ?? '—')],
-      ['Schedule Number', dispatch?.ref_schedule_number ?? '—'],
-      ['Nagare Time', dispatch?.ref_supply_date ?? '—'],
-      ['Scheduled Sent Date', dispatch?.ref_schedule_sent_date ?? '—'],
-      ['Total Schedule Bins', String(dispatch?.total_schedule_bins ?? '—')],
-      ['SMG Qty (Bins Scanned)', String(dispatch?.smg_qty ?? '—')],
+    const rows: [string, string][] = [
+      ['Product Code',            dispatch?.ref_product_code ?? '—'],
+      ['Case Pack',               String(dispatch?.ref_case_pack ?? '—')],
+      ['Schedule Number',         dispatch?.ref_schedule_number ?? '—'],
+      ['Supply Date',             dispatch?.ref_supply_date ?? '—'],
+      ['Nagare Time',             dispatch?.ref_schedule_sent_date ?? '—'],
+      ['Total Schedule Bins',     String(dispatch?.total_schedule_bins ?? '—')],
+      ['SMG Qty (Bins Scanned)',  String(dispatch?.smg_qty ?? '—')],
       ['Bin Qty (Picks Scanned)', String(dispatch?.bin_qty ?? '—')],
-      ['Status', dispatch?.status ?? '—'],
+      ['Status',                  dispatch?.status ?? '—'],
     ];
 
     let y = 46;
@@ -155,7 +156,7 @@ export default function DispatchScreen() {
       pdf.text(label + ':', 14, y);
       pdf.setTextColor(30, 30, 50);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(String(value), 95, y);
+      pdf.text(value, 95, y);
       y += 13;
     });
 
@@ -171,7 +172,7 @@ export default function DispatchScreen() {
     pdf.save(`dispatch_${dispatch?.dispatch_number}.pdf`);
   };
 
-  // Styles
+  // ─── Styles ────────────────────────────────────────────────────────────────
   const page: React.CSSProperties = {
     minHeight: '100vh',
     background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)',
@@ -195,6 +196,7 @@ export default function DispatchScreen() {
     borderRadius: '14px', padding: '20px', marginBottom: '16px',
   };
 
+  // ─── Loading ───────────────────────────────────────────────────────────────
   if (loading || !dispatch) {
     return (
       <>
@@ -213,10 +215,12 @@ export default function DispatchScreen() {
     ? Math.round((dispatch.smg_qty / dispatch.total_schedule_bins) * 100)
     : 0;
 
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{KEYFRAMES}</style>
       <div style={page}>
+        {/* Grid background */}
         <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(120,190,32,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(120,190,32,0.03) 1px,transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none', zIndex: 0 }} />
 
         {/* Top bar */}
@@ -241,16 +245,16 @@ export default function DispatchScreen() {
 
         <div style={content}>
 
-          {/* Dispatch info grid */}
+          {/* ── Dispatch info grid ── */}
           <div style={{ ...card, animation: 'fadeUp 0.4s ease both' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
               {[
-                { label: 'Product Code', value: dispatch.ref_product_code ?? '—' },
-                { label: 'Case Pack', value: dispatch.ref_case_pack ?? '—' },
+                { label: 'Product Code',        value: dispatch.ref_product_code ?? '—' },
+                { label: 'Case Pack',           value: dispatch.ref_case_pack ?? '—' },
                 { label: 'Total Schedule Bins', value: dispatch.total_schedule_bins ?? '—' },
-                { label: 'Schedule No', value: dispatch.ref_schedule_number ?? '—' },
-                { label: 'Nagare Time', value: dispatch.ref_supply_date ?? '—' },
-                { label: 'Scheduled Sent Date', value: dispatch.ref_schedule_sent_date ?? '—' },
+                { label: 'Schedule No',         value: dispatch.ref_schedule_number ?? '—' },
+                { label: 'Supply Date',         value: dispatch.ref_supply_date ?? '—' },
+                { label: 'Nagare Time',         value: dispatch.ref_schedule_sent_date ?? '—' },
               ].map(item => (
                 <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '4px' }}>{item.label}</div>
@@ -275,7 +279,7 @@ export default function DispatchScreen() {
             </div>
           </div>
 
-          {/* Alert message */}
+          {/* ── Alert message ── */}
           {message && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '10px',
@@ -295,7 +299,7 @@ export default function DispatchScreen() {
             </div>
           )}
 
-          {/* SUCCESS BANNER */}
+          {/* ── SUCCESS BANNER ── */}
           {(isComplete || dispatch.status === 'COMPLETED') ? (
             <div style={{ animation: 'successPop 0.5s ease both' }}>
               <div style={{
@@ -303,7 +307,7 @@ export default function DispatchScreen() {
                 border: '1px solid rgba(120,190,32,0.4)',
                 borderRadius: '16px', padding: '32px 24px', textAlign: 'center', marginBottom: '16px',
               }}>
-                {/* Checkmark */}
+                {/* Checkmark circle */}
                 <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 28px rgba(120,190,32,0.45)' }}>
                   <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
                     <path d="M7 17L14 24L27 10" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -320,9 +324,9 @@ export default function DispatchScreen() {
                 {/* Summary stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '24px' }}>
                   {[
-                    { label: 'Schedule Bins', value: dispatch.total_schedule_bins, color: '#fff', bg: 'rgba(255,255,255,0.08)' },
-                    { label: 'SMG Qty', value: dispatch.smg_qty, color: '#e8a800', bg: 'rgba(255,185,0,0.10)' },
-                    { label: 'Bin Qty', value: dispatch.bin_qty, color: '#78BE20', bg: 'rgba(120,190,32,0.12)' },
+                    { label: 'Schedule Bins', value: dispatch.total_schedule_bins, color: '#fff',     bg: 'rgba(255,255,255,0.08)' },
+                    { label: 'SMG Qty',       value: dispatch.smg_qty,             color: '#e8a800', bg: 'rgba(255,185,0,0.10)'  },
+                    { label: 'Bin Qty',       value: dispatch.bin_qty,             color: '#78BE20', bg: 'rgba(120,190,32,0.12)' },
                   ].map(s => (
                     <div key={s.label} style={{ background: s.bg, borderRadius: '12px', padding: '16px 10px', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '8px' }}>{s.label}</div>
@@ -331,7 +335,7 @@ export default function DispatchScreen() {
                   ))}
                 </div>
 
-                {/* Export PDF button */}
+                {/* Export PDF */}
                 <button onClick={exportPDF}
                   style={{ padding: '12px 32px', borderRadius: '10px', border: '1px solid rgba(120,190,32,0.5)', background: 'rgba(120,190,32,0.12)', color: '#78BE20', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
                   onMouseOver={e => (e.currentTarget.style.background = 'rgba(120,190,32,0.22)')}
@@ -340,9 +344,10 @@ export default function DispatchScreen() {
                 </button>
               </div>
             </div>
+
           ) : (
             <>
-              {/* Bin scan input */}
+              {/* ── Bin scan input ── */}
               {showBin && (
                 <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -370,7 +375,7 @@ export default function DispatchScreen() {
                       value={binInput}
                       onChange={e => setBinInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleBinSubmit()}
-                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit', transition: 'border 0.2s' }}
+                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit' }}
                       onFocus={e => e.currentTarget.style.border = '1px solid rgba(120,190,32,0.6)'}
                       onBlur={e => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'}
                     />
@@ -385,7 +390,7 @@ export default function DispatchScreen() {
                 </div>
               )}
 
-              {/* Pick scan input */}
+              {/* ── Pick scan input ── */}
               {!showBin && (
                 <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -412,7 +417,7 @@ export default function DispatchScreen() {
                       value={pickInput}
                       onChange={e => setPickInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handlePickSubmit()}
-                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit', transition: 'border 0.2s' }}
+                      style={{ flex: 1, padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none', fontFamily: 'inherit' }}
                       onFocus={e => e.currentTarget.style.border = '1px solid rgba(120,190,32,0.6)'}
                       onBlur={e => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)'}
                     />
