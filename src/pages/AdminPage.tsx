@@ -40,11 +40,19 @@ export default function AdminPage() {
   const openModal = (user = null) => {
     if (user) {
       setEditingUser(user);
+      
+      // FIX: Map the names returned by the backend back to IDs using the customers list
+      // This ensures the checkboxes are checked correctly during Edit
+      const currentCustomerNames = user.assigned_customers || [];
+      const mappedIds = customers
+        .filter(c => currentCustomerNames.includes(c.name))
+        .map(c => c.id);
+
       setFormData({
         email: user.email,
         password: '',
         role: user.role,
-        customerIds: user.assigned_customers // Note: Backend should return IDs here for proper editing
+        customerIds: mappedIds 
       });
     } else {
       setEditingUser(null);
@@ -94,8 +102,6 @@ export default function AdminPage() {
       <style>{KEYFRAMES}</style>
       <div style={page}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-          
-          {/* TOP NAVIGATION BAR */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <button 
@@ -156,7 +162,6 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* MODAL */}
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: '#1B1B4B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', width: '500px', padding: '32px', animation: 'slideIn 0.3s ease both' }}>

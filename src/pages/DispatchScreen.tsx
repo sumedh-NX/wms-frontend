@@ -39,9 +39,7 @@ export default function DispatchScreen() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [completing, setCompleting] = useState(false);
 
-  // Derived state: If smg_qty > bin_qty -> a bin was scanned, pick is pending -> show PICK
   const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
-
   const isComplete = dispatch
     ? dispatch.smg_qty === dispatch.total_schedule_bins &&
       dispatch.bin_qty === dispatch.total_schedule_bins &&
@@ -115,32 +113,32 @@ export default function DispatchScreen() {
   const exportPDF = () => {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const W = pdf.internal.pageSize.getWidth();
-
     const PRIMARY_GREEN = [120, 190, 32];
     const DARK_TEXT = [40, 40, 40];
     const GRAY_TEXT = [120, 120, 120];
     const ROW_BG = [245, 247, 250];
 
-    // HEADER ACCENT
     pdf.setFillColor(...PRIMARY_GREEN);
     pdf.rect(0, 0, W, 10, 'F');
-
-    // TITLE
     pdf.setFontSize(18);
     pdf.setTextColor(...DARK_TEXT);
     pdf.setFont('helvetica', 'bold');
     pdf.text('WMS Dispatch Report', 14, 20);
     
-    // SUMMARY SECTION
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
+    
+    const lastPickLog = logs.filter(l => l.type === 'PICKLIST').pop();
+    const dispatchedAt = lastPickLog ? new Date(lastPickLog.created_at).toLocaleString('en-IN') : '—';
+
     const summary = [
       ['Dispatch No:', `DSP-${dispatch?.dispatch_number}`],
       ['Customer ID:', 'Nittera'],
       ['Status:', dispatch?.status || 'IN_PROGRESS'],
       ['Created By:', logs[0]?.operator_name || 'System'],
       ['Created At:', new Date(dispatch?.created_at || '').toLocaleString('en-IN')],
-      ['Nagare Time:', dispatch?.ref_supply_date || '—'], // UPDATED LABEL
+      ['Nagare Time:', dispatch?.ref_supply_date || '—'],
+      ['Dispatched At:', dispatchedAt],
     ];
 
     let y = 30;
@@ -154,7 +152,6 @@ export default function DispatchScreen() {
       y += 7;
     });
 
-    // SECTION 2: DISPATCH ITEMS
     y += 10;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
@@ -168,27 +165,21 @@ export default function DispatchScreen() {
       { l: 'Product', x: 14 }, { l: 'Sched No', x: 40 }, { l: 'S-Qty', x: 80 },
       { l: 'S-Bins', x: 100 }, { l: 'SMG', x: 115 }, { l: 'Bin', x: 125 },
       { l: 'Status', x: 135 }, { l: 'Nagare Time', x: 160 }, { l: 'Supply Date', x: 190 }
-    ]; // UPDATED "Sent" to "Nagare Time"
-    
+    ];
     itemCols.forEach(col => pdf.text(col.l, col.x, y));
 
     y += 6;
     pdf.setFillColor(...ROW_BG);
-    pdf.rect(14, y-4, W-28, 8, 'F'); 
+    pdf.rect(14, y-4, W-28, 8, 'F');
     pdf.setTextColor(...DARK_TEXT);
     pdf.setFont('helvetica', 'normal');
-    
     const rowData = [
       dispatch?.ref_product_code, dispatch?.ref_schedule_number, dispatch?.supply_quantity,
       dispatch?.total_schedule_bins, dispatch?.smg_qty, dispatch?.bin_qty,
       'COMPLETE', dispatch?.ref_supply_date, dispatch?.ref_schedule_sent_date
     ];
-    
-    itemCols.forEach((col, i) => {
-      pdf.text(String(rowData[i] || '—'), col.x, y);
-    });
+    itemCols.forEach((col, i) => { pdf.text(String(rowData[i] || '—'), col.x, y); });
 
-    // SECTION 3: SCAN AUDIT LOG
     y += 20;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
@@ -202,7 +193,6 @@ export default function DispatchScreen() {
       { l: 'Timestamp', x: 14 }, { l: 'Type', x: 50 }, { l: 'Code', x: 80 },
       { l: 'Product', x: 120 }, { l: 'Result', x: 150 }, { l: 'Operator', x: 180 }
     ];
-    
     logCols.forEach(col => pdf.text(col.l, col.x, y));
 
     y += 6;
@@ -211,10 +201,8 @@ export default function DispatchScreen() {
         pdf.setFillColor(...ROW_BG);
         pdf.rect(14, y-4, W-28, 7, 'F');
       }
-      
       pdf.setTextColor(...DARK_TEXT);
       pdf.setFont('helvetica', 'normal');
-      
       if (log.result === 'FAIL') pdf.setTextColor(200, 0, 0);
       else if (log.result === 'PASS') pdf.setTextColor(0, 150, 0);
 
@@ -226,11 +214,7 @@ export default function DispatchScreen() {
         log.result,
         log.operator_name || 'Unknown'
       ];
-
-      logCols.forEach((col, i) => {
-        pdf.text(String(logData[i] || '—'), col.x, y);
-      });
-
+      logCols.forEach((col, i) => { pdf.text(String(logData[i] || '—'), col.x, y); });
       pdf.setTextColor(...DARK_TEXT);
       y += 7;
       if (y > 280) { pdf.addPage(); y = 20; }
@@ -240,33 +224,19 @@ export default function DispatchScreen() {
     pdf.setTextColor(...GRAY_TEXT);
     pdf.text(`Generated: ${new Date().toLocaleString('en-IN')} | WMS Dispatch Portal`, 14, 290);
     pdf.text(`Page 1 of 1`, W-30, 290);
-
     pdf.save(`Dispatch_${dispatch?.dispatch_number}.pdf`);
   };
 
-
   const page: React.CSSProperties = {
-    minHeight: '100vh',
-    background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)',
+    minHeight: '100vh', background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)',
     fontFamily: "'DM Sans','Segoe UI',sans-serif",
   };
-
   const topBar: React.CSSProperties = {
-    position: 'sticky', top: 0, zIndex: 10,
-    background: 'rgba(27,27,75,0.88)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px',
+    position: 'sticky', top: 0, zIndex: 10, background: 'rgba(27,27,75,0.88)', backdropFilter: 'blur(20px)',
+    borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px',
   };
-
-  const content: React.CSSProperties = {
-    maxWidth: '680px', margin: '0 auto', padding: '24px 20px',
-    position: 'relative', zIndex: 1,
-  };
-
-  const card: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '14px', padding: '20px', marginBottom: '16px',
-  };
+  const content: React.CSSProperties = { maxWidth: '680px', margin: '0 auto', padding: '24px 20px', position: 'relative', zIndex: 1 };
+  const card: React.CSSProperties = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '20px', marginBottom: '16px' };
 
   if (loading || !dispatch) {
     return (
@@ -279,33 +249,24 @@ export default function DispatchScreen() {
     );
   }
 
-  const progress = dispatch.total_schedule_bins > 0
-    ? Math.round((dispatch.smg_qty / dispatch.total_schedule_bins) * 100)
-    : 0;
+  const progress = dispatch.total_schedule_bins > 0 ? Math.round((dispatch.smg_qty / dispatch.total_schedule_bins) * 100) : 0;
 
   return (
     <>
       <style>{KEYFRAMES}</style>
       <div style={page}>
         <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(120,190,32,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(120,190,32,0.03) 1px,transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none', zIndex: 0 }} />
-
         <div style={topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
-                <rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/>
-              </svg>
+              <svg width="16" height="16" viewBox="0, 0 24 24" fill="none"><path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/></svg>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>Dispatch #{dispatch.dispatch_number}</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>NX Logistics · WMS Outbound</div>
             </div>
           </div>
-          <button onClick={() => navigate(-1)}
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            ← Back
-          </button>
+          <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
         </div>
 
         <div style={content}>
@@ -316,8 +277,8 @@ export default function DispatchScreen() {
                 { label: 'Case Pack', value: dispatch.ref_case_pack },
                 { label: 'Total Schedule Bins', value: dispatch.total_schedule_bins },
                 { label: 'Schedule No', value: dispatch.ref_schedule_number },
-                { label: 'Nagare Time', value: dispatch.ref_supply_date }, // SWAPPED
-                { label: 'Supply Date', value: dispatch.ref_schedule_sent_date }, // SWAPPED
+                { label: 'Nagare Time', value: dispatch.ref_supply_date }, 
+                { label: 'Supply Date', value: dispatch.ref_schedule_sent_date }, 
               ].map(item => (
                 <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '4px' }}>{item.label}</div>
@@ -325,7 +286,6 @@ export default function DispatchScreen() {
                 </div>
               ))}
             </div>
-
             <div style={{ marginTop: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Scan Progress</span>
@@ -348,9 +308,7 @@ export default function DispatchScreen() {
             <div style={{ animation: 'successPop 0.5s ease both' }}>
               <div style={{ background: 'linear-gradient(135deg,rgba(120,190,32,0.18),rgba(120,190,32,0.06))', border: '1px solid rgba(120,190,32,0.4)', borderRadius: '16px', padding: '32px 24px', textAlign: 'center', marginBottom: '16px' }}>
                 <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 28px rgba(120,190,32,0.45)' }}>
-                  <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-                    <path d="M7 17L14 24L27 10" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <svg width="34" height="34" viewBox="0 0 34 34" fill="none"><path d="M7 17L14 24L27 10" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
                 <div style={{ color: '#78BE20', fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>{completing ? 'Completing...' : 'Batch Complete!'}</div>
                 <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '28px' }}>All bins and picks scanned successfully</div>
@@ -380,7 +338,6 @@ export default function DispatchScreen() {
                   <CameraScanner onScan={txt => setBinInput(txt)} />
                 </div>
               )}
-
               {!showBin && (
                 <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both', border: '1px solid rgba(120,190,32,0.4)', background: 'rgba(120,190,32,0.05)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
