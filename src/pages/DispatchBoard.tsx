@@ -60,7 +60,7 @@ export default function DispatchBoard() {
         body: JSON.stringify({ customerId }),
       });
       const data = await r.json();
-      navigate(`/dispatches/${data.id}?customerId=${customerId}`);
+      navigate(`/dispatch/${data.id}?customerId=${customerId}`);
     } catch (e) {
       console.error(e);
     } finally {
