@@ -129,7 +129,7 @@ export default function AdminPage() {
                     <th style={{ padding: '16px' }}>Role</th>
                     <th style={{ padding: '16px' }}>Assigned Customers</th>
                     <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                  </tr
+                  </tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
