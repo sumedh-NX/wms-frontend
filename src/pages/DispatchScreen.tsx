@@ -116,7 +116,6 @@ export default function DispatchScreen() {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const W = pdf.internal.pageSize.getWidth();
 
-    // --- BRANDING & COLORS ---
     const PRIMARY_GREEN = [120, 190, 32];
     const DARK_TEXT = [40, 40, 40];
     const GRAY_TEXT = [120, 120, 120];
@@ -135,15 +134,13 @@ export default function DispatchScreen() {
     // SUMMARY SECTION
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(...GRAY_TEXT);
-    
     const summary = [
       ['Dispatch No:', `DSP-${dispatch?.dispatch_number}`],
       ['Customer ID:', 'Nittera'],
       ['Status:', dispatch?.status || 'IN_PROGRESS'],
-      ['Created By:', logs[0]?.operator_name || 'System'], // Actual username from JOIN
+      ['Created By:', logs[0]?.operator_name || 'System'],
       ['Created At:', new Date(dispatch?.created_at || '').toLocaleString('en-IN')],
-      ['Schedule Sent Date:', dispatch?.ref_supply_date || '—'], // Nagare Time
+      ['Nagare Time:', dispatch?.ref_supply_date || '—'], // UPDATED LABEL
     ];
 
     let y = 30;
@@ -157,7 +154,7 @@ export default function DispatchScreen() {
       y += 7;
     });
 
-    // --- SECTION 2: DISPATCH ITEMS (GRID LAYOUT) ---
+    // SECTION 2: DISPATCH ITEMS
     y += 10;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
@@ -170,14 +167,14 @@ export default function DispatchScreen() {
     const itemCols = [
       { l: 'Product', x: 14 }, { l: 'Sched No', x: 40 }, { l: 'S-Qty', x: 80 },
       { l: 'S-Bins', x: 100 }, { l: 'SMG', x: 115 }, { l: 'Bin', x: 125 },
-      { l: 'Status', x: 135 }, { l: 'Sent', x: 160 }, { l: 'SupplyDate', x: 190 }
-    ];
+      { l: 'Status', x: 135 }, { l: 'Nagare Time', x: 160 }, { l: 'Supply Date', x: 190 }
+    ]; // UPDATED "Sent" to "Nagare Time"
     
     itemCols.forEach(col => pdf.text(col.l, col.x, y));
 
     y += 6;
     pdf.setFillColor(...ROW_BG);
-    pdf.rect(14, y-4, W-28, 8, 'F'); // Zebra striping background
+    pdf.rect(14, y-4, W-28, 8, 'F'); 
     pdf.setTextColor(...DARK_TEXT);
     pdf.setFont('helvetica', 'normal');
     
@@ -191,7 +188,7 @@ export default function DispatchScreen() {
       pdf.text(String(rowData[i] || '—'), col.x, y);
     });
 
-    // --- SECTION 3: SCAN AUDIT LOG (GRID LAYOUT) ---
+    // SECTION 3: SCAN AUDIT LOG
     y += 20;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
@@ -210,7 +207,6 @@ export default function DispatchScreen() {
 
     y += 6;
     logs.forEach((log, index) => {
-      // Zebra Striping
       if (index % 2 === 1) {
         pdf.setFillColor(...ROW_BG);
         pdf.rect(14, y-4, W-28, 7, 'F');
@@ -219,9 +215,8 @@ export default function DispatchScreen() {
       pdf.setTextColor(...DARK_TEXT);
       pdf.setFont('helvetica', 'normal');
       
-      // Dynamic Result Color
-      if (log.result === 'FAIL') pdf.setTextColor(200, 0, 0); // Red for fail
-      else if (log.result === 'PASS') pdf.setTextColor(0, 150, 0); // Green for pass
+      if (log.result === 'FAIL') pdf.setTextColor(200, 0, 0);
+      else if (log.result === 'PASS') pdf.setTextColor(0, 150, 0);
 
       const logData = [
         new Date(log.created_at).toLocaleString('en-IN'),
@@ -229,19 +224,18 @@ export default function DispatchScreen() {
         log.code,
         log.product_code,
         log.result,
-        log.operator_name || 'Unknown' // Now uses joined username from backend
+        log.operator_name || 'Unknown'
       ];
 
       logCols.forEach((col, i) => {
         pdf.text(String(logData[i] || '—'), col.x, y);
       });
 
-      pdf.setTextColor(...DARK_TEXT); // Reset color for next row
+      pdf.setTextColor(...DARK_TEXT);
       y += 7;
       if (y > 280) { pdf.addPage(); y = 20; }
     });
 
-    // FOOTER
     pdf.setFontSize(8);
     pdf.setTextColor(...GRAY_TEXT);
     pdf.text(`Generated: ${new Date().toLocaleString('en-IN')} | WMS Dispatch Portal`, 14, 290);
@@ -249,6 +243,7 @@ export default function DispatchScreen() {
 
     pdf.save(`Dispatch_${dispatch?.dispatch_number}.pdf`);
   };
+
 
   const page: React.CSSProperties = {
     minHeight: '100vh',

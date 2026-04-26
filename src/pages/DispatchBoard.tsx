@@ -25,30 +25,33 @@ export default function DispatchBoard() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [nagareDate, setNagareDate] = useState('');
 
-  const fetchDispatches = () => {
+  const fetchDispatches = (dateOverride?: string) => {
     const token = localStorage.getItem('token');
     setLoading(true);
     
+    const date = dateOverride !== undefined ? dateOverride : nagareDate;
     let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
-    if (dateRange.start && dateRange.end) {
-      url += `&startDate=${dateRange.start}&endDate=${dateRange.end}`;
+    if (date) {
+      url += `&nagareDate=${date}`;
     }
 
     fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(r => {
-        if (!r.ok) throw new Error('Server error');
-        return r.json();
-      })
+      .then(r => r.json())
       .then(data => setDispatches(Array.isArray(data) ? data : []))
       .catch(() => setDispatches([]))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchDispatches(); }, []);
+
+  const handleClear = () => {
+    setNagareDate('');
+    fetchDispatches('');
+  };
 
   const handleNew = async () => {
     const token = localStorage.getItem('token');
@@ -61,11 +64,7 @@ export default function DispatchBoard() {
       });
       const data = await r.json();
       navigate(`/dispatch/${data.id}?customerId=${customerId}`);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCreating(false);
-    }
+    } catch (e) { console.error(e); } finally { setCreating(false); }
   };
 
   const filtered = dispatches.filter(d => filter === 'ALL' || d.status === filter);
@@ -95,7 +94,7 @@ export default function DispatchBoard() {
 
   const statusBadge = (status: string): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.4px',
+    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
     background: status === 'COMPLETED' ? 'rgba(120,190,32,0.15)' : 'rgba(255,185,0,0.12)',
     color: status === 'COMPLETED' ? '#78BE20' : '#e8a800',
     border: `1px solid ${status === 'COMPLETED' ? 'rgba(120,190,32,0.3)' : 'rgba(255,185,0,0.25)'}`,
@@ -114,14 +113,10 @@ export default function DispatchBoard() {
       <style>{KEYFRAMES}</style>
       <div style={page}>
         <div style={grid} />
-
         <div style={topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
-                <rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/>
-              </svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/></svg>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>NX Logistics</div>
@@ -129,14 +124,8 @@ export default function DispatchBoard() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button onClick={() => navigate('/select-customer')}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-              ← Customers
-            </button>
-            <button onClick={logout}
-              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-              Sign out
-            </button>
+            <button onClick={() => navigate('/select-customer')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>← Customers</button>
+            <button onClick={logout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
           </div>
         </div>
 
@@ -146,31 +135,17 @@ export default function DispatchBoard() {
               <h1 style={{ color: '#fff', fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px', margin: 0 }}>Dispatches</h1>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13.5px', margin: '4px 0 0' }}>Customer #{customerId} · {dispatches.length} total</p>
             </div>
-            <button onClick={handleNew} disabled={creating}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '10px', border: 'none',
-                background: creating ? 'rgba(120,190,32,0.5)' : 'linear-gradient(135deg,#78BE20,#5ea318)',
-                color: '#fff', fontSize: '14px', fontWeight: 700, cursor: creating ? 'wait' : 'pointer',
-                boxShadow: '0 4px 16px rgba(120,190,32,0.3)', fontFamily: 'inherit', transition: 'all 0.2s',
-              }}>
+            <button onClick={handleNew} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '10px', border: 'none', background: creating ? 'rgba(120,190,32,0.5)' : 'linear-gradient(135deg,#78BE20,#5ea318)', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: creating ? 'wait' : 'pointer', boxShadow: '0 4px 16px rgba(120,190,32,0.3)', fontFamily: 'inherit', transition: 'all 0.2s' }}>
               {creating ? 'Creating...' : <><span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> New Dispatch</>}
             </button>
           </div>
 
-          {/* NAGARE TIME RANGE FILTER */}
-          <div style={{ 
-            display: 'flex', gap: '12px', alignItems: 'center', 
-            background: 'rgba(255,255,255,0.05)', padding: '16px', 
-            borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.1)',
-            animation: 'fadeUp 0.4s ease 0.1s both'
-          }}>
-            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>Nagare Time Range:</div>
-            <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} 
-              style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>to</span>
-            <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} 
-              style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
-            <button onClick={fetchDispatches} style={{ background: '#78BE20', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', marginLeft: 'auto' }}>Filter</button>
+          {/* NAGARE TIME FILTER (SINGLE PICKER) */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.1)', animation: 'fadeUp 0.4s ease 0.1s both' }}>
+            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>Nagare Time:</div>
+            <input type="date" value={nagareDate} onChange={e => setNagareDate(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
+            <button onClick={() => fetchDispatches()} style={{ background: '#78BE20', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>Filter</button>
+            <button onClick={handleClear} style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Clear</button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px', animation: 'fadeUp 0.4s ease 0.2s both' }}>
@@ -200,9 +175,7 @@ export default function DispatchBoard() {
               Loading dispatches...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>
-              No dispatches found matching your criteria.
-            </div>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>No dispatches found.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map((d, i) => (
@@ -217,18 +190,13 @@ export default function DispatchBoard() {
                     transition: 'all 0.18s ease',
                     animation: `rowIn 0.3s ease ${i * 0.03}s both`,
                   }}
-                  onMouseOver={e => {
-                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)';
-                    (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(120,190,32,0.3)';
-                  }}
-                  onMouseOut={e => {
-                    (e.currentTarget as HTMLDivElement).style.background = d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)';
-                    (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.08)';
-                  }}>
+                  onMouseOver={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                  onMouseOut={e => { (e.currentTarget as HTMLDivElement).style.background = d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)'; }}
+                >
                   <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
                     <div style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>#{d.dispatch_number}</div>
                     <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_product_code || '—'}</div>
-		    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_schedule_number || '—'}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_schedule_number || '—'}</div>
                     <div style={{ color: '#78BE20', fontSize: '13px', fontWeight: 600 }}>{d.ref_supply_date || '—'}</div>
                   </div>
                   <div style={statusBadge(d.status)}>{d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}</div>
