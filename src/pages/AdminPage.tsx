@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const KEYFRAMES = `
@@ -8,6 +9,7 @@ const KEYFRAMES = `
 `;
 
 export default function AdminPage() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +44,7 @@ export default function AdminPage() {
         email: user.email,
         password: '',
         role: user.role,
-        customerIds: user.assigned_customers // This needs to be IDs, not names. 
-        // Note: You might need to update the backend to return customer IDs in the user list
+        customerIds: user.assigned_customers // Note: Backend should return IDs here for proper editing
       });
     } else {
       setEditingUser(null);
@@ -66,10 +67,12 @@ export default function AdminPage() {
   };
 
   const deleteUser = async (id: number) => {
-    if (!window.confirm('Are you sure?')) return;
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
     const token = localStorage.getItem('token');
-    await axios.delete(`${import.meta.env.VITE_API_BASE}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    fetchAdminData();
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_BASE}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetchAdminData();
+    } catch (e) { alert('Error deleting user'); }
   };
 
   const toggleCustomer = (id: number) => {
@@ -91,12 +94,28 @@ export default function AdminPage() {
       <style>{KEYFRAMES}</style>
       <div style={page}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          
+          {/* TOP NAVIGATION BAR */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-            <div>
-              <h1 style={{ fontSize: '28px', margin: 0 }}>User Management</h1>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Manage staff access and customer assignments</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button 
+                onClick={() => navigate('/')} 
+                style={{ 
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', 
+                  borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', 
+                  padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s'
+                }}
+                onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+              >
+                ← Back to Home
+              </button>
+              <div>
+                <h1 style={{ fontSize: '28px', margin: 0, letterSpacing: '-0.5px' }}>User Management</h1>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Control staff access and customer assignments</p>
+              </div>
             </div>
-            <button onClick={() => openModal()} style={{ background: '#78BE20', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>+ Add User</button>
+            <button onClick={() => openModal()} style={{ background: '#78BE20', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(120,190,32,0.3)' }}>+ Add User</button>
           </div>
 
           {loading ? (
@@ -105,12 +124,12 @@ export default function AdminPage() {
             <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', fontSize: '12px', textTransform: 'uppercase' }}>
-                  <tr>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                     <th style={{ padding: '16px' }}>User</th>
                     <th style={{ padding: '16px' }}>Role</th>
                     <th style={{ padding: '16px' }}>Assigned Customers</th>
                     <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
-                  </tr>
+                  </tr
                 </thead>
                 <tbody>
                   {users.map(u => (
@@ -120,7 +139,7 @@ export default function AdminPage() {
                         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>ID: {u.id}</div>
                       </td>
                       <td style={{ padding: '16px' }}>
-                        <span style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}>{u.role}</span>
+                        <span style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>{u.role}</span>
                       </td>
                       <td style={{ padding: '16px', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
                         {u.assigned_customers?.join(', ') || 'No customers'}
@@ -141,20 +160,20 @@ export default function AdminPage() {
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: '#1B1B4B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', width: '500px', padding: '32px', animation: 'slideIn 0.3s ease both' }}>
-              <h2 style={{ margin: '0 0 24px 0', fontSize: '22px' }}>{editingUser ? 'Edit User' : 'Create New User'}</h2>
+              <h2 style={{ margin: '0 0 24px 0', fontSize: '22px', color: '#fff' }}>{editingUser ? 'Edit User' : 'Create New User'}</h2>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>Email Address</label>
-                  <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', outline: 'none' }} />
+                  <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>Password {editingUser && '(Leave blank to keep current)'}</label>
-                  <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', outline: 'none' }} />
+                  <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>Role</label>
-                  <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', outline: 'none' }}>
+                  <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', outline: 'none', boxSizing: 'border-box' }}>
                     <option value="operator">Operator</option>
                     <option value="supervisor">Supervisor</option>
                     <option value="admin">Admin</option>
@@ -166,7 +185,7 @@ export default function AdminPage() {
                   <div style={{ maxHeight: '150px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
                     {customers.map(c => (
                       <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', marginBottom: '8px', cursor: 'pointer', color: '#fff' }}>
-                        <input type="checkbox" checked={formData.customerIds.includes(c.id)} onChange={() => toggleCustomer(c.id)} />
+                        <input type="checkbox" checked={formData.customerIds.includes(c.id)} onChange={() => toggleCustomer(c.id)} style={{ accentColor: '#78BE20' }} />
                         {c.name} ({c.code})
                       </label>
                     ))}
