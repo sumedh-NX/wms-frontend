@@ -39,7 +39,9 @@ export default function DispatchScreen() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [completing, setCompleting] = useState(false);
 
+  // Derived state: If smg_qty > bin_qty -> a bin was scanned, pick is pending -> show PICK
   const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
+
   const isComplete = dispatch
     ? dispatch.smg_qty === dispatch.total_schedule_bins &&
       dispatch.bin_qty === dispatch.total_schedule_bins &&
@@ -114,79 +116,136 @@ export default function DispatchScreen() {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const W = pdf.internal.pageSize.getWidth();
 
-    // HEADER SECTION
+    // --- BRANDING & COLORS ---
+    const PRIMARY_GREEN = [120, 190, 32];
+    const DARK_TEXT = [40, 40, 40];
+    const GRAY_TEXT = [120, 120, 120];
+    const ROW_BG = [245, 247, 250];
+
+    // HEADER ACCENT
+    pdf.setFillColor(...PRIMARY_GREEN);
+    pdf.rect(0, 0, W, 10, 'F');
+
+    // TITLE
     pdf.setFontSize(18);
-    pdf.setTextColor(40, 40, 40);
+    pdf.setTextColor(...DARK_TEXT);
+    pdf.setFont('helvetica', 'bold');
     pdf.text('WMS Dispatch Report', 14, 20);
     
+    // SUMMARY SECTION
     pdf.setFontSize(10);
-    pdf.setTextColor(100, 100, 100);
-    const headerData = [
-      ['Dispatch No', `DSP-${dispatch?.dispatch_number}`],
-      ['Customer ID', 'Nittera'],
-      ['Status', dispatch?.status || 'IN_PROGRESS'],
-      ['Created By', 'ops'],
-      ['Created At', new Date(dispatch?.created_at || '').toLocaleString('en-IN')],
-      ['Schedule Sent Date', dispatch?.ref_supply_date || '—'],
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(...GRAY_TEXT);
+    
+    const summary = [
+      ['Dispatch No:', `DSP-${dispatch?.dispatch_number}`],
+      ['Customer ID:', 'Nittera'],
+      ['Status:', dispatch?.status || 'IN_PROGRESS'],
+      ['Created By:', logs[0]?.operator_name || 'System'], // Actual username from JOIN
+      ['Created At:', new Date(dispatch?.created_at || '').toLocaleString('en-IN')],
+      ['Schedule Sent Date:', dispatch?.ref_supply_date || '—'], // Nagare Time
     ];
 
-    let yHeader = 30;
-    headerData.forEach(([label, val]) => {
+    let y = 30;
+    summary.forEach(([label, val]) => {
+      pdf.setTextColor(...GRAY_TEXT);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(`${label}:`, 14, yHeader);
+      pdf.text(label, 14, y);
+      pdf.setTextColor(...DARK_TEXT);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(String(val), 45, yHeader);
-      yHeader += 7;
+      pdf.text(String(val), 45, y);
+      y += 7;
     });
 
-    // SECTION 2: DISPATCH ITEMS
+    // --- SECTION 2: DISPATCH ITEMS (GRID LAYOUT) ---
+    y += 10;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(40, 40, 40);
-    pdf.text('Dispatch Items', 14, yHeader + 10);
+    pdf.setTextColor(...DARK_TEXT);
+    pdf.text('Dispatch Items', 14, y);
     
+    y += 7;
     pdf.setFontSize(8);
-    const cols = ['Product', 'Sched No', 'S-Qty', 'S-Bins', 'SMG', 'Bin', 'Status', 'Sent', 'SupplyDate'];
-    let xCol = 14;
-    pdf.setTextColor(120, 120, 120);
-    cols.forEach(col => {
-      pdf.text(col, xCol, yHeader + 15);
-      xCol += 22;
+    pdf.setTextColor(...GRAY_TEXT);
+    const itemCols = [
+      { l: 'Product', x: 14 }, { l: 'Sched No', x: 40 }, { l: 'S-Qty', x: 80 },
+      { l: 'S-Bins', x: 100 }, { l: 'SMG', x: 115 }, { l: 'Bin', x: 125 },
+      { l: 'Status', x: 135 }, { l: 'Sent', x: 160 }, { l: 'SupplyDate', x: 190 }
+    ];
+    
+    itemCols.forEach(col => pdf.text(col.l, col.x, y));
+
+    y += 6;
+    pdf.setFillColor(...ROW_BG);
+    pdf.rect(14, y-4, W-28, 8, 'F'); // Zebra striping background
+    pdf.setTextColor(...DARK_TEXT);
+    pdf.setFont('helvetica', 'normal');
+    
+    const rowData = [
+      dispatch?.ref_product_code, dispatch?.ref_schedule_number, dispatch?.supply_quantity,
+      dispatch?.total_schedule_bins, dispatch?.smg_qty, dispatch?.bin_qty,
+      'COMPLETE', dispatch?.ref_supply_date, dispatch?.ref_schedule_sent_date
+    ];
+    
+    itemCols.forEach((col, i) => {
+      pdf.text(String(rowData[i] || '—'), col.x, y);
     });
 
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(
-      `${dispatch?.ref_product_code || '—'} ${dispatch?.ref_schedule_number || '—'} ${dispatch?.supply_quantity || '—'} ${dispatch?.total_schedule_bins || '—'} ${dispatch?.smg_qty || '—'} ${dispatch?.bin_qty || '—'} COMPLETE ${dispatch?.ref_supply_date || '—'} ${dispatch?.ref_schedule_sent_date || '—'}`,
-      14, yHeader + 20
-    );
-
-    // SECTION 3: SCAN AUDIT LOG
+    // --- SECTION 3: SCAN AUDIT LOG (GRID LAYOUT) ---
+    y += 20;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(40, 40, 40);
-    pdf.text('Scan Audit Log', 14, yHeader + 35);
+    pdf.setTextColor(...DARK_TEXT);
+    pdf.text('Scan Audit Log', 14, y);
     
+    y += 7;
     pdf.setFontSize(8);
-    const logCols = ['Timestamp', 'Type', 'Code', 'Product', 'Result', 'Operator'];
-    xCol = 14;
-    pdf.setTextColor(120, 120, 120);
-    logCols.forEach(col => {
-      pdf.text(col, xCol, yHeader + 40);
-      xCol += 30;
+    pdf.setTextColor(...GRAY_TEXT);
+    const logCols = [
+      { l: 'Timestamp', x: 14 }, { l: 'Type', x: 50 }, { l: 'Code', x: 80 },
+      { l: 'Product', x: 120 }, { l: 'Result', x: 150 }, { l: 'Operator', x: 180 }
+    ];
+    
+    logCols.forEach(col => pdf.text(col.l, col.x, y));
+
+    y += 6;
+    logs.forEach((log, index) => {
+      // Zebra Striping
+      if (index % 2 === 1) {
+        pdf.setFillColor(...ROW_BG);
+        pdf.rect(14, y-4, W-28, 7, 'F');
+      }
+      
+      pdf.setTextColor(...DARK_TEXT);
+      pdf.setFont('helvetica', 'normal');
+      
+      // Dynamic Result Color
+      if (log.result === 'FAIL') pdf.setTextColor(200, 0, 0); // Red for fail
+      else if (log.result === 'PASS') pdf.setTextColor(0, 150, 0); // Green for pass
+
+      const logData = [
+        new Date(log.created_at).toLocaleString('en-IN'),
+        log.type,
+        log.code,
+        log.product_code,
+        log.result,
+        log.operator_name || 'Unknown' // Now uses joined username from backend
+      ];
+
+      logCols.forEach((col, i) => {
+        pdf.text(String(logData[i] || '—'), col.x, y);
+      });
+
+      pdf.setTextColor(...DARK_TEXT); // Reset color for next row
+      y += 7;
+      if (y > 280) { pdf.addPage(); y = 20; }
     });
 
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont('helvetica', 'normal');
-    let yLog = yHeader + 45;
-    logs.forEach((log) => {
-      pdf.text(
-        `${new Date(log.created_at).toLocaleString('en-IN')} ${log.type} ${log.code} ${log.product_code} ${log.result} ${log.operator_user_id || 'ops'}`,
-        14, yLog
-      );
-      yLog += 7;
-      if (yLog > 280) { pdf.addPage(); yLog = 20; }
-    });
+    // FOOTER
+    pdf.setFontSize(8);
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text(`Generated: ${new Date().toLocaleString('en-IN')} | WMS Dispatch Portal`, 14, 290);
+    pdf.text(`Page 1 of 1`, W-30, 290);
 
     pdf.save(`Dispatch_${dispatch?.dispatch_number}.pdf`);
   };
