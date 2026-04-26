@@ -207,7 +207,7 @@ export default function DispatchBoard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map((d, i) => (
                 <div key={d.id}
-                  onClick={() => navigate(`/dispatches/${d.id}?customerId=${customerId}`)}
+                  onClick={() => navigate(`/dispatch/${d.id}?customerId=${customerId}`)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)',
@@ -227,9 +227,9 @@ export default function DispatchBoard() {
                   }}>
                   <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
                     <div style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>#{d.dispatch_number}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_product_code}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_schedule_number}</div>
-                    <div style={{ color: '#78BE20', fontSize: '13px', fontWeight: 600 }}>{d.ref_supply_date}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_product_code || '—'}</div>
+		    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_schedule_number || '—'}</div>
+                    <div style={{ color: '#78BE20', fontSize: '13px', fontWeight: 600 }}>{d.ref_supply_date || '—'}</div>
                   </div>
                   <div style={statusBadge(d.status)}>{d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}</div>
                 </div>
