@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -25,11 +25,18 @@ export default function DispatchBoard() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   const fetchDispatches = () => {
     const token = localStorage.getItem('token');
     setLoading(true);
-    fetch(`${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`, {
+    
+    let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
+    if (dateRange.start && dateRange.end) {
+      url += `&startDate=${dateRange.start}&endDate=${dateRange.end}`;
+    }
+
+    fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(r => {
@@ -53,7 +60,7 @@ export default function DispatchBoard() {
         body: JSON.stringify({ customerId }),
       });
       const data = await r.json();
-      navigate(`/dispatch/${data.id}?customerId=${customerId}`);
+      navigate(`/dispatches/${data.id}?customerId=${customerId}`);
     } catch (e) {
       console.error(e);
     } finally {
@@ -83,7 +90,7 @@ export default function DispatchBoard() {
   };
   const content: React.CSSProperties = {
     position: 'relative', zIndex: 1,
-    maxWidth: '760px', margin: '0 auto', padding: '28px 20px',
+    maxWidth: '900px', margin: '0 auto', padding: '28px 20px',
   };
 
   const statusBadge = (status: string): React.CSSProperties => ({
@@ -108,7 +115,6 @@ export default function DispatchBoard() {
       <div style={page}>
         <div style={grid} />
 
-        {/* Top bar */}
         <div style={topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -117,7 +123,7 @@ export default function DispatchBoard() {
                 <rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/>
               </svg>
             </div>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>NX Logistics</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>WMS Outbound</div>
             </div>
@@ -135,31 +141,39 @@ export default function DispatchBoard() {
         </div>
 
         <div style={content}>
-
-          {/* Page header */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', animation: 'fadeUp 0.4s ease both' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', animation: 'fadeUp 0.4s ease both' }}>
             <div>
               <h1 style={{ color: '#fff', fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px', margin: 0 }}>Dispatches</h1>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13.5px', margin: '4px 0 0' }}>Customer #{customerId} · {dispatches.length} total</p>
             </div>
             <button onClick={handleNew} disabled={creating}
               style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '11px 20px', borderRadius: '10px', border: 'none',
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '10px', border: 'none',
                 background: creating ? 'rgba(120,190,32,0.5)' : 'linear-gradient(135deg,#78BE20,#5ea318)',
                 color: '#fff', fontSize: '14px', fontWeight: 700, cursor: creating ? 'wait' : 'pointer',
                 boxShadow: '0 4px 16px rgba(120,190,32,0.3)', fontFamily: 'inherit', transition: 'all 0.2s',
-                flexShrink: 0,
               }}>
-              {creating
-                ? <><div style={{ width: '15px', height: '15px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Creating...</>
-                : <><span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> New Dispatch</>
-              }
+              {creating ? 'Creating...' : <><span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> New Dispatch</>}
             </button>
           </div>
 
-          {/* Stat cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px', animation: 'fadeUp 0.4s ease 0.05s both' }}>
+          {/* NAGARE TIME RANGE FILTER */}
+          <div style={{ 
+            display: 'flex', gap: '12px', alignItems: 'center', 
+            background: 'rgba(255,255,255,0.05)', padding: '16px', 
+            borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.1)',
+            animation: 'fadeUp 0.4s ease 0.1s both'
+          }}>
+            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>Nagare Time Range:</div>
+            <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} 
+              style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>to</span>
+            <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} 
+              style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
+            <button onClick={fetchDispatches} style={{ background: '#78BE20', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', marginLeft: 'auto' }}>Filter</button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px', animation: 'fadeUp 0.4s ease 0.2s both' }}>
             {[
               { label: 'Total', value: dispatches.length, color: 'rgba(255,255,255,0.08)', textColor: '#fff' },
               { label: 'In Progress', value: inProgressCount, color: 'rgba(255,185,0,0.10)', textColor: '#e8a800' },
@@ -172,8 +186,7 @@ export default function DispatchBoard() {
             ))}
           </div>
 
-          {/* Filter tabs */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', animation: 'fadeUp 0.4s ease 0.1s both' }}>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', animation: 'fadeUp 0.4s ease 0.3s both' }}>
             {(['ALL', 'IN_PROGRESS', 'COMPLETED'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)} style={filterBtn(f)}>
                 {f === 'ALL' ? 'All' : f === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}
@@ -181,63 +194,44 @@ export default function DispatchBoard() {
             ))}
           </div>
 
-          {/* Dispatch list */}
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.4)', fontSize: '14px', padding: '40px 0', justifyContent: 'center' }}>
-              <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
+              <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginRight: '12px' }} />
               Loading dispatches...
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>
-              <div style={{ fontSize: '36px', marginBottom: '12px', opacity: 0.4 }}>📦</div>
-              {filter === 'ALL' ? 'No dispatches yet. Create one to get started.' : `No ${filter.replace('_', ' ').toLowerCase()} dispatches.`}
+              No dispatches found matching your criteria.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map((d, i) => (
                 <div key={d.id}
-                  onClick={() => navigate(`/dispatch/${d.id}?customerId=${customerId}`)}
+                  onClick={() => navigate(`/dispatches/${d.id}?customerId=${customerId}`)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '16px',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderLeft: `4px solid ${d.status === 'COMPLETED' ? '#78BE20' : '#e8a800'}`,
                     borderRadius: '12px', padding: '16px 18px', cursor: 'pointer',
                     transition: 'all 0.18s ease',
                     animation: `rowIn 0.3s ease ${i * 0.03}s both`,
                   }}
                   onMouseOver={e => {
-                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.07)';
+                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)';
                     (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(120,190,32,0.3)';
-                    (e.currentTarget as HTMLDivElement).style.transform = 'translateX(2px)';
                   }}
                   onMouseOut={e => {
-                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)';
+                    (e.currentTarget as HTMLDivElement).style.background = d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)';
                     (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.08)';
-                    (e.currentTarget as HTMLDivElement).style.transform = 'translateX(0)';
                   }}>
-                  <div style={{
-                    width: '44px', height: '44px', borderRadius: '10px', flexShrink: 0,
-                    background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.15)' : 'rgba(255,185,0,0.12)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: d.status === 'COMPLETED' ? '#78BE20' : '#e8a800',
-                    fontSize: '13px', fontWeight: 700,
-                  }}>
-                    #{d.dispatch_number}
+                  <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>#{d.dispatch_number}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_product_code}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: 500 }}>{d.ref_schedule_number}</div>
+                    <div style={{ color: '#78BE20', fontSize: '13px', fontWeight: 600 }}>{d.ref_supply_date}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '3px' }}>
-                      Dispatch #{d.dispatch_number}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px' }}>
-                      {formatDate(d.created_at)}
-                    </div>
-                  </div>
-                  <div style={statusBadge(d.status)}>
-                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: d.status === 'COMPLETED' ? '#78BE20' : '#e8a800', flexShrink: 0 }} />
-                    {d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}
-                  </div>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.3 }}>
-                    <path d="M6 4L10 8L6 12" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <div style={statusBadge(d.status)}>{d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}</div>
                 </div>
               ))}
             </div>
