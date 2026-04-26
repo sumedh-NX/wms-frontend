@@ -8,20 +8,18 @@ import LoginPage from './pages/LoginPage';
 import CustomerSelect from './pages/CustomerSelect';
 import DispatchBoard from './pages/DispatchBoard';
 import DispatchScreen from './pages/DispatchScreen';
+import AdminPage from './pages/AdminPage'; // NEW
 
 // Import Auth Hooks
 import { useAuth } from './hooks/useAuth';
 
 /**
  * ProtectedRoute Component
- * This wrapper prevents unauthenticated users from accessing specific pages.
- * It now handles the "Loading" state to prevent the "Refresh -> Login" bug.
+ * Handles the "Loading" state to prevent the "Refresh -> Login" bug.
  */
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, isLoading } = useAuth();
 
-  // 1. If the system is still checking for a token in localStorage, 
-  // show a loading spinner instead of redirecting.
   if (isLoading) {
     return (
       <Box 
@@ -29,15 +27,13 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
         justifyContent="center" 
         alignItems="center" 
         minHeight="100vh" 
-        backgroundColor="#F5F5F5"
+        backgroundColor="#1B1B4B" // Changed to match dark theme
       >
-        <CircularProgress color="primary" />
+        <CircularProgress sx={{ color: '#78BE20' }} />
       </Box>
     );
   }
 
-  // 2. Once loading is finished, if no user is found, redirect to login.
-  // If a user is found, render the children (the page).
   return user ? children : <Navigate to="/login" replace />;
 }
 
@@ -50,8 +46,6 @@ export default function App() {
       <Router>
         <Routes>
           {/* --- Public Route --- */}
-          {/* If user is already logged in and tries to go to /login, 
-              redirect them to the home page. */}
           <Route 
             path="/login" 
             element={user ? <Navigate to="/" replace /> : <LoginPage />} 
@@ -63,14 +57,20 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Routes>
-                  {/* The Root route (/) shows the Customer Selection screen */}
+                  {/* Home: Customer Selection */}
                   <Route index element={<CustomerSelect />} />
                   
-                  {/* The Dispatch Board list */}
+                  {/* Dispatch Board list */}
                   <Route path="dispatches" element={<DispatchBoard />} />
                   
-                  {/* The specific Dispatch Scanning screen */}
+                  {/* Specific Dispatch Scanning (Singular path) */}
                   <Route path="dispatch/:id/*" element={<DispatchScreen />} />
+                  
+                  {/* Admin Panel - Only accessible if role is admin */}
+                  <Route 
+                    path="admin" 
+                    element={user?.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} 
+                  />
                 </Routes>
               </ProtectedRoute>
             }
