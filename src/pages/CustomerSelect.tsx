@@ -9,7 +9,7 @@ const KEYFRAMES = `
 `;
 
 export default function CustomerSelect() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth(); // Added 'user' here for role check
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<any[]>([]);
   const [selected, setSelected] = useState('');
@@ -79,12 +79,20 @@ export default function CustomerSelect() {
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.9px', textTransform: 'uppercase', marginTop: '1px' }}>WMS Outbound</div>
               </div>
             </div>
-            <button onClick={logout}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
-              onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.10)')}
-              onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
-              Sign out
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {user?.role === 'admin' && (
+                <button onClick={() => navigate('/admin')} 
+                  style={{ background: 'rgba(120,190,32,0.1)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '8px', color: '#78BE20', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                  ⚙️ Admin
+                </button>
+              )}
+              <button onClick={logout}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+                onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.10)')}
+                onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+                Sign out
+              </button>
+            </div>
           </div>
 
           <div style={{ color: '#fff', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.4px', marginBottom: '6px' }}>Select Customer</div>

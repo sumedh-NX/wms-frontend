@@ -16,7 +16,7 @@ function formatDate(iso: string) {
 }
 
 export default function DispatchBoard() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth(); // Access user role
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const customerId = params.get('customerId');
@@ -40,7 +40,10 @@ export default function DispatchBoard() {
     fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Server error');
+        return r.json();
+      })
       .then(data => setDispatches(Array.isArray(data) ? data : []))
       .catch(() => setDispatches([]))
       .finally(() => setLoading(false));
@@ -64,7 +67,11 @@ export default function DispatchBoard() {
       });
       const data = await r.json();
       navigate(`/dispatch/${data.id}?customerId=${customerId}`);
-    } catch (e) { console.error(e); } finally { setCreating(false); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const filtered = dispatches.filter(d => filter === 'ALL' || d.status === filter);
@@ -94,7 +101,7 @@ export default function DispatchBoard() {
 
   const statusBadge = (status: string): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.4px',
     background: status === 'COMPLETED' ? 'rgba(120,190,32,0.15)' : 'rgba(255,185,0,0.12)',
     color: status === 'COMPLETED' ? '#78BE20' : '#e8a800',
     border: `1px solid ${status === 'COMPLETED' ? 'rgba(120,190,32,0.3)' : 'rgba(255,185,0,0.25)'}`,
@@ -113,10 +120,14 @@ export default function DispatchBoard() {
       <style>{KEYFRAMES}</style>
       <div style={page}>
         <div style={grid} />
+
         <div style={topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+                <rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/>
+              </svg>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>NX Logistics</div>
@@ -124,8 +135,22 @@ export default function DispatchBoard() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button onClick={() => navigate('/select-customer')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>← Customers</button>
-            <button onClick={logout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
+            <button onClick={() => navigate('/')}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              ← Customers
+            </button>
+
+            {user?.role === 'admin' && (
+              <button onClick={() => navigate('/admin')} 
+                style={{ background: 'rgba(120,190,32,0.1)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '8px', color: '#78BE20', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                ⚙️ Admin Panel
+              </button>
+            )}
+
+            <button onClick={logout}
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Sign out
+            </button>
           </div>
         </div>
 
@@ -135,7 +160,13 @@ export default function DispatchBoard() {
               <h1 style={{ color: '#fff', fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px', margin: 0 }}>Dispatches</h1>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13.5px', margin: '4px 0 0' }}>Customer #{customerId} · {dispatches.length} total</p>
             </div>
-            <button onClick={handleNew} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '10px', border: 'none', background: creating ? 'rgba(120,190,32,0.5)' : 'linear-gradient(135deg,#78BE20,#5ea318)', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: creating ? 'wait' : 'pointer', boxShadow: '0 4px 16px rgba(120,190,32,0.3)', fontFamily: 'inherit', transition: 'all 0.2s' }}>
+            <button onClick={handleNew} disabled={creating}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '10px', border: 'none',
+                background: creating ? 'rgba(120,190,32,0.5)' : 'linear-gradient(135deg,#78BE20,#5ea318)',
+                color: '#fff', fontSize: '14px', fontWeight: 700, cursor: creating ? 'wait' : 'pointer',
+                boxShadow: '0 4px 16px rgba(120,190,32,0.3)', fontFamily: 'inherit', transition: 'all 0.2s',
+              }}>
               {creating ? 'Creating...' : <><span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> New Dispatch</>}
             </button>
           </div>
@@ -175,7 +206,7 @@ export default function DispatchBoard() {
               Loading dispatches...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>No dispatches found.</div>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>No dispatches found matching your criteria.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map((d, i) => (
