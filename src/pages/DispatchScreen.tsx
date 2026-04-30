@@ -206,10 +206,16 @@ export default function DispatchScreen() {
       if (log.result === 'FAIL') pdf.setTextColor(200, 0, 0);
       else if (log.result === 'PASS') pdf.setTextColor(0, 150, 0);
 
+      // --- PICKLIST CODE TRUNCATION LOGIC ---
+      let displayCode = log.code || '—';
+      if (log.type === 'PICKLIST' && displayCode.length > 17) {
+        displayCode = displayCode.substring(0, 17) + '...';
+      }
+
       const logData = [
         new Date(log.created_at).toLocaleString('en-IN'),
         log.type,
-        log.code,
+        displayCode,
         log.product_code,
         log.result,
         log.operator_name || 'Unknown'
@@ -259,7 +265,7 @@ export default function DispatchScreen() {
         <div style={topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0, 0 24 24" fill="none"><path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/></svg>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>Dispatch #{dispatch.dispatch_number}</div>
