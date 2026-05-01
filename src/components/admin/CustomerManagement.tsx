@@ -11,13 +11,16 @@ export default function CustomerManagement() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const token = localStorage,
+      const token = localStorage.getItem('token');
       const res = await axios.get(`${import.meta.env.VITE_API_BASE}/admin/customers`, { 
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+        headers: { Authorization: `Bearer ${token}` } 
       });
       setCustomers(res.data);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) { 
+      console.error("Fetch customers error:", e); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { fetchCustomers(); }, []);
@@ -45,7 +48,9 @@ export default function CustomerManagement() {
       }
       setIsModalOpen(false);
       fetchCustomers();
-    } catch (e) { alert('Error saving customer'); }
+    } catch (e) { 
+      alert('Error saving customer'); 
+    }
   };
 
   return (
