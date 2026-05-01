@@ -24,12 +24,23 @@ export default function DispatchBoard() {
   const [filter, setFilter] = useState<'all' | 'open' | 'completed'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const customerId = sessionStorage.getItem('customerId') || '';
+  // Get customerId from URL params or sessionStorage
+  const customerId = new URLSearchParams(window.location.search).get('customerId') || 
+                     sessionStorage.getItem('customerId') || 
+                     localStorage.getItem('customerId') || '';
 
   const loadDispatches = async () => {
     try {
-      const params = new URLSearchParams({ customerId });
+      if (!customerId) {
+        setError('Customer ID not found. Please select a customer first.');
+        setLoading(false);
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.append('customerId', customerId);
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
 
@@ -38,8 +49,11 @@ export default function DispatchBoard() {
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       setDispatches(res.data);
-    } catch (e) {
-      console.error(e);
+      setError(null);
+    } catch (e: any) {
+      console.error('Error loading dispatches:', e);
+      setError(e.response?.data?.message || 'Failed to load dispatches');
+      setDispatches([]);
     } finally {
       setLoading(false);
     }
@@ -47,7 +61,7 @@ export default function DispatchBoard() {
 
   useEffect(() => {
     loadDispatches();
-  }, [startDate, endDate]);
+  }, [customerId, startDate, endDate]);
 
   const filtered = dispatches.filter(d => {
     if (filter === 'open') return d.status !== 'COMPLETED';
@@ -201,6 +215,15 @@ export default function DispatchBoard() {
     color: 'rgba(255,255,255,0.3)',
   };
 
+  const errorState: React.CSSProperties = {
+    background: 'rgba(255,80,80,0.12)',
+    border: '1px solid rgba(255,80,80,0.35)',
+    borderRadius: '12px',
+    padding: '16px',
+    color: '#ff7070',
+    marginBottom: '20px',
+  };
+
   if (loading) {
     return (
       <div style={page}>
@@ -243,6 +266,12 @@ export default function DispatchBoard() {
           ← Back
         </button>
       </div>
+
+      {error && (
+        <div style={errorState}>
+          ⚠️ {error}
+        </div>
+      )}
 
       <div style={statsContainer}>
         <div style={statCard}>
