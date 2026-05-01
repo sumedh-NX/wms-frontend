@@ -11,8 +11,10 @@ export default function CustomerManagement() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/admin/customers`, { headers: { Authorization: `Bearer ${token}` } });
+      const token = localStorage,
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/admin/customers`, { 
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+      });
       setCustomers(res.data);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -35,10 +37,11 @@ export default function CustomerManagement() {
     const token = localStorage.getItem('token');
     try {
       if (editingCustomer) {
-        // Update logic (would require a PUT /admin/customers/:id endpoint)
         alert('Edit Customer API not yet implemented in backend, but UI is ready!');
       } else {
-        await axios.post(`${import.meta.env.VITE_API_BASE}/admin/customers`, formData, { headers: { Authorization: `Bearer ${token}` } });
+        await axios.post(`${import.meta.env.VITE_API_BASE}/admin/customers`, formData, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
       }
       setIsModalOpen(false);
       fetchCustomers();
@@ -94,6 +97,6 @@ export default function CustomerManagement() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

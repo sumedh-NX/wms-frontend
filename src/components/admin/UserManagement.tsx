@@ -54,12 +54,19 @@ export default function UserManagement() {
   const deleteUser = async (id: number) => {
     if (!window.confirm('Are you sure?')) return;
     const token = localStorage.getItem('token');
-    await axios.delete(`${import.meta.env.VITE_API_BASE}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    fetchAdminData();
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_BASE}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetchAdminData();
+    } catch (e) { alert('Error deleting user'); }
   };
 
   const toggleCustomer = (id: number) => {
-    setFormData(prev => ({ ...prev, customerIds: prev.customerIds.includes(id) ? prev.customerIds.filter(cId => cId !== id) : [...prev.customerIds, id] }));
+    setFormData(prev => ({ 
+      ...prev, 
+      customerIds: prev.customerIds.includes(id) 
+        ? prev.customerIds.filter((cId: number) => cId !== id) 
+        : [...prev.customerIds, id] 
+    }));
   };
 
   return (
@@ -131,12 +138,8 @@ export default function UserManagement() {
               <button onClick={handleSubmit} style={{ background: '#78BE20', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>Save User</button>
             </div>
           </div>
-        )}
-      </div>
-    );
-  }
-
-  const toggleCustomer = (id: number) => {
-    setFormData(prev => ({ ...prev, customerIds: prev.customerIds.includes(id) ? prev.customerIds.filter(cId => cId !== id) : [...prev.customerIds, id] }));
-  };
+        </div>
+      )}
+    </div>
+  );
 }
