@@ -1,58 +1,54 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
-interface Dispatch {
-  id: number;
-  dispatch_number: string;
-  customer_id: string;
-  status: string;
-  ref_product_code: string;
-  ref_schedule_number: string;
-  ref_supply_date: string;
-  ref_schedule_sent_date: string;
-  total_schedule_bins: number;
-  smg_qty: number;
-  bin_qty: number;
-  created_at: string;
+const KEYFRAMES = `
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes spin { to{transform:rotate(360deg)} }
+@keyframes rowIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+`;
+
+function formatDate(iso: string) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 export default function DispatchBoard() {
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const [dispatches, setDispatches] = useState<Dispatch[]>([]);
+  const [params] = useSearchParams();
+  const customerId = params.get('customerId');
+
+  const [dispatches, setDispatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'open' | 'completed'>('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  // Get customerId from URL params or sessionStorage
-  const customerId = new URLSearchParams(window.location.search).get('customerId') || 
-                     sessionStorage.getItem('customerId') || 
-                     localStorage.getItem('customerId') || '';
+  const fetchDispatches = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
-  const loadDispatches = async () => {
+    setLoading(true);
     try {
-      if (!customerId) {
-        setError('Customer ID not found. Please select a customer first.');
-        setLoading(false);
-        return;
+      let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
+      if (dateRange.start && dateRange.end) {
+        url += `&startDate=${dateRange.start}&endDate=${dateRange.end}`;
       }
 
-      const params = new URLSearchParams();
-      params.append('customerId', customerId);
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_BASE}/dispatch?${params}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setDispatches(res.data);
-      setError(null);
-    } catch (e: any) {
-      console.error('Error loading dispatches:', e);
-      setError(e.response?.data?.message || 'Failed to load dispatches');
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Network response was not ok');
+      
+      const data = await response.json();
+      setDispatches(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Fetch error:", error);
       setDispatches([]);
     } finally {
       setLoading(false);
@@ -60,310 +56,197 @@ export default function DispatchBoard() {
   };
 
   useEffect(() => {
-    loadDispatches();
-  }, [customerId, startDate, endDate]);
+    fetchDispatches();
+  }, [customerId]);
 
-  const filtered = dispatches.filter(d => {
-    if (filter === 'open') return d.status !== 'COMPLETED';
-    if (filter === 'completed') return d.status === 'COMPLETED';
-    return true;
-  });
-
-  const stats = {
-    total: dispatches.length,
-    open: dispatches.filter(d => d.status !== 'COMPLETED').length,
-    completed: dispatches.filter(d => d.status === 'COMPLETED').length,
+  const handleClear = () => {
+    setDateRange({ start: '', end: '' });
+    fetchDispatches();
   };
 
+  const handleNew = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setCreating(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ customerId }),
+      });
+      const data = await response.json();
+      navigate(`/dispatch/${data.id}?customerId=${customerId}`);
+    } catch (e) {
+      console.error("Creation error:", e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Derived stats
+  const filtered = dispatches.filter(d => filter === 'ALL' || d.status === filter);
+  const inProgressCount = dispatches.filter(d => d.status === 'IN_PROGRESS').length;
+  const completedCount = dispatches.filter(d => d.status === 'COMPLETED').length;
+  const totalCount = dispatches.length;
+
+  // Styles
   const page: React.CSSProperties = {
     minHeight: '100vh',
     background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)',
     fontFamily: "'DM Sans','Segoe UI',sans-serif",
-    padding: '24px 20px',
+    color: '#fff'
   };
 
-  const header: React.CSSProperties = {
-    marginBottom: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  const grid: React.CSSProperties = {
+    position: 'fixed', inset: 0,
+    backgroundImage: 'linear-gradient(rgba(120,190,32,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(120,190,32,0.03) 1px,transparent 1px)',
+    backgroundSize: '48px 48px', pointerEvents: 'none', zIndex: 0,
   };
 
-  const title: React.CSSProperties = {
-    color: '#fff',
-    fontSize: '28px',
-    fontWeight: 700,
+  const topBar: React.CSSProperties = {
+    position: 'sticky', top: 0, zIndex: 10,
+    background: 'rgba(27,27,75,0.85)', backdropFilter: 'blur(20px)',
+    borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0 24px', 
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px',
   };
 
-  const statsContainer: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: '12px',
-    marginBottom: '24px',
-  };
-
-  const statCard: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '12px',
-    padding: '16px',
-    textAlign: 'center',
-  };
-
-  const statValue: React.CSSProperties = {
-    color: '#78BE20',
-    fontSize: '24px',
-    fontWeight: 700,
-    marginBottom: '4px',
-  };
-
-  const statLabel: React.CSSProperties = {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: '11px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  };
-
-  const filterBar: React.CSSProperties = {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  };
-
-  const filterButton = (isActive: boolean): React.CSSProperties => ({
-    padding: '8px 16px',
-    borderRadius: '8px',
-    border: isActive ? '1px solid #78BE20' : '1px solid rgba(255,255,255,0.10)',
-    background: isActive ? 'rgba(120,190,32,0.15)' : 'rgba(255,255,255,0.04)',
-    color: isActive ? '#78BE20' : 'rgba(255,255,255,0.5)',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'all 0.2s ease',
-  });
-
-  const dateInput: React.CSSProperties = {
-    padding: '8px 12px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.10)',
-    background: 'rgba(0,0,0,0.2)',
-    color: '#fff',
-    fontSize: '12px',
-    fontFamily: 'inherit',
-    outline: 'none',
-  };
-
-  const tableContainer: React.CSSProperties = {
-    overflowX: 'auto',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  };
-
-  const table: React.CSSProperties = {
-    width: '100%',
-    borderCollapse: 'collapse',
-  };
-
-  const tableHeader: React.CSSProperties = {
-    background: 'rgba(120,190,32,0.08)',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-  };
-
-  const tableHeaderCell: React.CSSProperties = {
-    padding: '14px',
-    textAlign: 'left',
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: '11px',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    borderRight: '1px solid rgba(255,255,255,0.04)',
-  };
-
-  const tableBodyRow = (index: number): React.CSSProperties => ({
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-    background: index % 2 === 1 ? 'rgba(255,255,255,0.015)' : 'transparent',
-    transition: 'background 0.2s ease',
-    cursor: 'pointer',
-  });
-
-  const tableBodyCell: React.CSSProperties = {
-    padding: '14px',
-    color: '#fff',
-    fontSize: '13px',
-    borderRight: '1px solid rgba(255,255,255,0.04)',
+  const content: React.CSSProperties = {
+    position: 'relative', zIndex: 1,
+    maxWidth: '1200px', margin: '0 auto', padding: '28px 20px',
   };
 
   const statusBadge = (status: string): React.CSSProperties => ({
-    display: 'inline-block',
-    padding: '4px 10px',
-    borderRadius: '6px',
-    fontSize: '10px',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    background: status === 'COMPLETED' ? 'rgba(120,190,32,0.2)' : 'rgba(232,168,0,0.2)',
+    display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+    background: status === 'COMPLETED' ? 'rgba(120,190,32,0.15)' : 'rgba(255,185,0,0.12)',
     color: status === 'COMPLETED' ? '#78BE20' : '#e8a800',
+    border: `1px solid ${status === 'COMPLETED' ? 'rgba(120,190,32,0.3)' : 'rgba(255,185,0,0.25)'}`,
   });
 
-  const emptyState: React.CSSProperties = {
-    textAlign: 'center',
-    padding: '60px 20px',
-    color: 'rgba(255,255,255,0.3)',
-  };
-
-  const errorState: React.CSSProperties = {
-    background: 'rgba(255,80,80,0.12)',
-    border: '1px solid rgba(255,80,80,0.35)',
-    borderRadius: '12px',
-    padding: '16px',
-    color: '#ff7070',
-    marginBottom: '20px',
-  };
-
-  if (loading) {
-    return (
-      <div style={page}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'rgba(255,255,255,0.4)' }}>
-          <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginRight: '12px' }} />
-          Loading dispatches...
-        </div>
-      </div>
-    );
-  }
+  const filterBtn = (val: typeof filter): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
+    fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 600, transition: 'all 0.18s',
+    background: filter === val ? 'rgba(120,190,32,0.18)' : 'transparent',
+    color: filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
+    border: filter === val ? '1px solid rgba(120,190,32,0.35)' : '1px solid transparent',
+  });
 
   return (
-    <div style={page}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
-        @keyframes spin { to{transform:rotate(360deg)} }
-        table tbody tr:hover { background: rgba(120,190,32,0.08) !important; }
-      `}</style>
-
-      <div style={header}>
-        <div>
-          <div style={title}>Dispatches</div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginTop: '6px' }}>
-            Manage outbound dispatch operations
+    <>
+      <style>{KEYFRAMES}</style>
+      <div style={page}>
+        <div style={grid} />
+        
+        <div style={topBar}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><rect x="9" y="14" width="6" height="6" rx="1" stroke="white" strokeWidth="1.8"/>
+              </svg>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>NX Logistics</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>WMS Outbound</div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>← Customers</button>
+            {user?.role === 'admin' && (
+              <button onClick={() => navigate('/admin')} style={{ background: 'rgba(120,190,32,0.1)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '8px', color: '#78BE20', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>⚙️ Admin Panel</button>
+            )}
+            <button onClick={logout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
           </div>
         </div>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255,255,255,0.10)',
-            background: 'rgba(255,255,255,0.04)',
-            color: 'rgba(255,255,255,0.5)',
-            fontSize: '13px',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          ← Back
-        </button>
-      </div>
 
-      {error && (
-        <div style={errorState}>
-          ⚠️ {error}
-        </div>
-      )}
+        <div style={content}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', animation: 'fadeUp 0.4s ease both' }}>
+            <div>
+              <h1 style={{ color: '#fff', fontSize: '26px', fontWeight: 700, margin: 0 }}>Dispatches</h1>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13.5px', margin: '4px 0 0' }}>Customer #{customerId} · {totalCount} total</p>
+            </div>
+            <button onClick={handleNew} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '10px', border: 'none', background: creating ? 'rgba(120,190,32,0.5)' : 'linear-gradient(135deg,#78BE20,#5ea318)', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: creating ? 'wait' : 'pointer', boxShadow: '0 4px 16px rgba(120,190,32,0.3)', fontFamily: 'inherit' }}>
+              {creating ? 'Creating...' : <><span style={{ fontSize: '18px', lineHeight: 1 }}>+</span> New Dispatch</>}
+            </button>
+          </div>
 
-      <div style={statsContainer}>
-        <div style={statCard}>
-          <div style={statValue}>{stats.total}</div>
-          <div style={statLabel}>Total</div>
-        </div>
-        <div style={statCard}>
-          <div style={{ ...statValue, color: '#e8a800' }}>{stats.open}</div>
-          <div style={statLabel}>Open</div>
-        </div>
-        <div style={statCard}>
-          <div style={{ ...statValue, color: '#78BE20' }}>{stats.completed}</div>
-          <div style={statLabel}>Completed</div>
-        </div>
-      </div>
+          {/* DISPATCH DATE RANGE FILTER */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.1)', animation: 'fadeUp 0.4s ease 0.1s both' }}>
+            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>Dispatch Date Range:</div>
+            <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>to</span>
+            <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
+            <button onClick={fetchDispatches} style={{ background: '#78BE20', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>Filter</button>
+            <button onClick={handleClear} style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Clear</button>
+          </div>
 
-      <div style={filterBar}>
-        <button onClick={() => setFilter('all')} style={filterButton(filter === 'all')}>
-          All Dispatches
-        </button>
-        <button onClick={() => setFilter('open')} style={filterButton(filter === 'open')}>
-          Open
-        </button>
-        <button onClick={() => setFilter('completed')} style={filterButton(filter === 'completed')}>
-          Completed
-        </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px', animation: 'fadeUp 0.4s ease 0.2s both' }}>
+            {[
+              { label: 'Total', value: totalCount, color: 'rgba(255,255,255,0.08)', textColor: '#fff' },
+              { label: 'In Progress', value: inProgressCount, color: 'rgba(255,185,0,0.10)', textColor: '#e8a800' },
+              { label: 'Completed', value: completedCount, color: 'rgba(120,190,32,0.10)', textColor: '#78BE20' }
+            ].map(s => (
+              <div key={s.label} style={{ background: s.color, border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase', marginBottom: '6px' }}>{s.label}</div>
+                <div style={{ color: s.textColor, fontSize: '28px', fontWeight: 700 }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-          <input
-            type="date"
-            placeholder="Start Date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            style={dateInput}
-          />
-          <input
-            type="date"
-            placeholder="End Date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            style={dateInput}
-          />
-        </div>
-      </div>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', animation: 'fadeUp 0.4s ease 0.3s both' }}>
+            {(['ALL', 'IN_PROGRESS', 'COMPLETED'] as const).map(f => (
+              <button key={f} onClick={() => setFilter(f)} style={filterBtn(f)}>{f === 'ALL' ? 'All' : f === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}</button>
+            ))}
+          </div>
 
-      {filtered.length === 0 ? (
-        <div style={emptyState}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
-          <div>No dispatches found</div>
-        </div>
-      ) : (
-        <div style={tableContainer}>
-          <table style={table}>
-            <thead style={tableHeader}>
-              <tr>
-                <th style={tableHeaderCell}>Dispatch No</th>
-                <th style={tableHeaderCell}>Product Code</th>
-                <th style={tableHeaderCell}>Schedule No</th>
-                <th style={tableHeaderCell}>Schedule Bin No</th>
-                <th style={tableHeaderCell}>Nagara Time</th>
-                <th style={tableHeaderCell}>Dispatch Date</th>
-                <th style={tableHeaderCell}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((dispatch, idx) => (
-                <tr
-                  key={dispatch.id}
-                  style={tableBodyRow(idx)}
-                  onClick={() => navigate(`/dispatch/${dispatch.id}`)}
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
+              <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginRight: '12px' }} />
+              Loading...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>No dispatches found.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* TABLE HEADER - UPDATED WITH SCHEDULE BINS */}
+              <div style={{ display: 'flex', padding: '0 18px 10px 18px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ width: '100px' }}>Dispatch #</div>
+                <div style={{ flex: 1 }}>Product Code</div>
+                <div style={{ flex: 1 }}>Sched No</div>
+                <div style={{ width: '120px' }}>Nagare Time</div>
+                <div style={{ width: '100px', textAlign: 'center' }}>Sched Bins</div>
+                <div style={{ width: '150px' }}>Dispatch Date</div>
+                <div style={{ width: '100px', textAlign: 'right' }}>Status</div>
+              </div>
+
+              {filtered.map((d, i) => (
+                <div key={d.id}
+                  onClick={() => navigate(`/dispatch/${d.id}?customerId=${customerId}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)', borderLeft: `4px solid ${d.status === 'COMPLETED' ? '#78BE20' : '#e8a800'}`,
+                    borderRadius: '12px', padding: '16px 18px', cursor: 'pointer', transition: 'all 0.18s ease',
+                    animation: `rowIn 0.3s ease ${i * 0.03}s both`,
+                  }}
+                  onMouseOver={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                  onMouseOut={e => { (e.currentTarget as HTMLDivElement).style.background = d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)'; }}
                 >
-                  <td style={tableBodyCell}>DSP-{dispatch.dispatch_number}</td>
-                  <td style={tableBodyCell}>{dispatch.ref_product_code}</td>
-                  <td style={tableBodyCell}>{dispatch.ref_schedule_number}</td>
-                  <td style={tableBodyCell}>{dispatch.total_schedule_bins}</td>
-                  <td style={tableBodyCell}>
-                    {dispatch.ref_supply_date ? new Date(dispatch.ref_supply_date).toLocaleDateString('en-IN') : '—'}
-                  </td>
-                  <td style={tableBodyCell}>
-                    {new Date(dispatch.created_at).toLocaleDateString('en-IN')}
-                  </td>
-                  <td style={tableBodyCell}>
-                    <span style={statusBadge(dispatch.status)}>
-                      {dispatch.status === 'COMPLETED' ? '✓ Completed' : '◯ Open'}
-                    </span>
-                  </td>
-                </tr>
+                  <div style={{ display: 'flex', gap: '0px', alignItems: 'center', width: '100%' }}>
+                    <div style={{ width: '100px', fontWeight: 700, color: '#fff', fontSize: '15px' }}>#{d.dispatch_number}</div>
+                    <div style={{ flex: 1, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{d.ref_product_code || '—'}</div>
+                    <div style={{ flex: 1, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{d.ref_schedule_number || '—'}</div>
+                    <div style={{ width: '120px', color: '#78BE20', fontSize: '13px', fontWeight: 600 }}>{d.ref_supply_date || '—'}</div>
+                    <div style={{ width: '100px', textAlign: 'center', color: '#fff', fontSize: '13px', fontWeight: 600 }}>{d.total_schedule_bins || '—'}</div>
+                    <div style={{ width: '150px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{formatDate(d.created_at)}</div>
+                    <div style={{ width: '100px', textAlign: 'right' }}><div style={statusBadge(d.status)}>{d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}</div></div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
