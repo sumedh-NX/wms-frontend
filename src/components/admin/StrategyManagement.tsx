@@ -68,14 +68,30 @@ export default function StrategyManagement() {
               <th style={{ padding: '16px', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody style={{ color: '#fff' }}>
             {strategies.map(s => (
               <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <td style={{ padding: '16px', fontWeight: 600 }}>{s.name}</td>
                 <td style={{ padding: '16px', color: 'rgba(255,255,255,0.6)' }}>{s.code}</td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>{s.description}</td>
                 <td style={{ padding: '16px', textAlign: 'right' }}>
-                   <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>View</button>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>View</button>
+                      
+                      {/* NEW DELETE BUTTON */}
+                      <button 
+                        onClick={async () => {
+                          if(window.confirm('Delete this strategy? This will remove it from all assigned customers.')) {
+                            const token = localStorage.getItem('token');
+                            await axios.delete(`${import.meta.env.VITE_API_BASE}/admin/strategies/${s.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                            fetchStrategies();
+                          }
+                        }}
+                        style={{ background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', color: '#ff7070', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        Delete
+                      </button>
+                  </div>
                 </td>
               </tr>
             ))}
