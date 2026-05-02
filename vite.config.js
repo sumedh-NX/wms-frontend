@@ -9,11 +9,19 @@ import react from '@vitejs/plugin-react'
   //},
 //})
 
-export default defineConfig({
-  plugins: [react()],
+//export default defineConfig({
+//  plugins: [react()],
   // If we are building for production (GitHub), use the subfolder. 
   // Otherwise (Test/Local), use the root.
-  base: process.env.NODE_ENV === 'production' ? '/wms-frontend/' : '/', 
+//  base: process.env.NODE_ENV === 'production' ? '/wms-frontend/' : '/', 
+//build: {
+//    chunkSizeWarningLimit: 1000,
+//  },
+//})
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/',               // <--- CHANGE THIS TO ROOT fro TEST AND LOCAL,
   build: {
     chunkSizeWarningLimit: 1000,
   },
