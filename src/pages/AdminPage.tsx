@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UserManagement from '../components/admin/UserManagement';
 import CustomerManagement from '../components/admin/CustomerManagement';
+import StrategyManagement from '../components/admin/StrategyManagement'; // IMPORTED
+import StrategyAssignment from '../components/admin/StrategyAssignment'; // IMPORTED
 
 const KEYFRAMES = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
@@ -30,15 +32,27 @@ export default function AdminPage() {
       <div style={page}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           
-          {/* TOP NAVIGATION */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>← Back to Home</button>
-              <h1 style={{ fontSize: '28px', margin: 0, letterSpacing: '-0.5px' }}>Admin Control Panel</h1>
+              <button 
+                onClick={() => navigate('/')} 
+                style={{ 
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', 
+                  borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', 
+                  padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s'
+                }}
+                onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+              >
+                ← Back to Home
+              </button>
+              <div>
+                <h1 style={{ fontSize: '28px', margin: 0, letterSpacing: '-0.5px' }}>Admin Control Panel</h1>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Control staff access and customer assignments</p>
+              </div>
             </div>
           </div>
 
-          {/* TAB NAVIGATION BAR */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1px' }}>
             {tabs.map(tab => (
               <button 
@@ -57,12 +71,12 @@ export default function AdminPage() {
             ))}
           </div>
 
-          {/* TAB CONTENT AREA */}
           <div style={{ animation: 'fadeUp 0.4s ease both' }}>
+            {/* FIXED: Replaced placeholders with actual components */}
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'customers' && <CustomerManagement />}
-            {activeTab === 'strategies' && <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>Strategy Master coming in Sprint B...</div>}
-            {activeTab === 'assignments' && <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>Assignments coming in Sprint B...</div>}
+            {activeTab === 'strategies' && <StrategyManagement />}
+            {activeTab === 'assignments' && <StrategyAssignment />}
           </div>
         </div>
       </div>
