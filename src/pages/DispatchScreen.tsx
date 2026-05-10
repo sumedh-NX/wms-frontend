@@ -440,7 +440,7 @@ export default function DispatchScreen() {
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
                       <input autoFocus type="text" placeholder={`${isUsui ? 'Scan Part QR...' : 'Paste / scan pick-list QR...'}`} value={scanInput} onChange={e => setScanInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleScanSubmit()} style={{ flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' }} />
                       <button onClick={() => setScanInput('')} style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
-                    </div}
+                    </div>
                     <CameraScanner onScan={txt => setScanInput(txt)} />
                   </div>
 
