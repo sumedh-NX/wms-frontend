@@ -31,18 +31,37 @@ type Dispatch = {
 export default function DispatchScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
+  
+  // State Management
   const [dispatch, setDispatch] = useState<Dispatch | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [binInput, setBinInput] = useState('');
-  const [pickInput, setPickInput] = useState('');
+  const [strategyCode, setStrategyCode] = useState('');
+  
+  // Workflow State
+  const [step, setStep] = useState<'NX' | 'BIN' | 'PART' | 'PICK'>('BIN');
+  const [scanInput, setScanInput] = useState('');
+  const [scannedParts, setScannedParts] = useState<string[]>([]);
+  const [requiredParts, setRequiredParts] = useState(0);
+  const [currentBinId, setCurrentBinId] = useState<number | null>(null);
+  
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [completing, setCompleting] = useState(false);
 
-  const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
+  // --- WORKFLOW HELPERS ---
+  const isUsui = strategyCode === 'USUI_1toMany';
+  
+  // Determine if we show the "Bin" input area
+  // Nitera: shows if smg <= bin (need more bins)
+  // Usui: shows if we are in the BIN step
+  const showBinInput = isUsui ? (step === 'BIN') : (!dispatch || dispatch.smg_qty <= dispatch.bin_qty);
+  
+  // Determine if we show the "Pick/Part" input area
+  const showDetailInput = isUsui ? (step === 'PART') : (!showBinInput);
+
   const isComplete = dispatch
     ? dispatch.smg_qty === dispatch.total_schedule_bins &&
-      dispatch.bin_qty === dispatch.total_schedule_bins &&
+      (isUsui ? true : dispatch.bin_qty === dispatch.total_schedule_bins) &&
       dispatch.total_schedule_bins > 0
     : false;
 
@@ -51,6 +70,19 @@ export default function DispatchScreen() {
       const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatch/${id}`);
       setDispatch(res.data.dispatch);
       setLogs(res.data.logs || []);
+
+      // Fetch the strategy to decide the workflow
+      const stratRes = await axios.get(`${import.meta.env.VITE_API_BASE}/admin/customer-strategies`);
+      const matching = stratRes.data.find((a: any) => a.customer_id = res.data.dispatch.customer_id);
+      const code = matching?.strategy_code || '';
+      setStrategyCode(code);
+
+      // Initialize starting step
+      if (code === 'USUI_1toMany') {
+        setStep('NX');
+      } else {
+        setStep('BIN');
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -71,29 +103,49 @@ export default function DispatchScreen() {
     window.location.href = '/wms-frontend/#/login';
   }, 10 * 60 * 1000);
 
-  const handleBinSubmit = async () => {
-    if (!binInput.trim()) return;
+  const handleScanSubmit = async () => {
+    if (!scanInput.trim()) return;
+    const input = scanInput.trim();
+    
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin`, { rawQr: binInput.trim() });
-      setDispatch(res.data);
-      setMessage({ type: 'success', text: 'Bin accepted' });
-      setBinInput('');
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Bin scan failed' });
-      setBinInput('');
-    }
-  };
+      let res;
+      if (isUsui) {
+        // --- USUI WORKFLOW ---
+        if (step === 'NX') {
+          res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-nx`, { rawQr: input });
+          setStep('BIN');
+        } else if (step === 'BIN') {
+          res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin-usui`, { rawQr: input });
+          setCurrentBinId(res.data.binId);
+          setRequiredParts(res.data.requiredParts);
+          setScannedParts([]); // Reset parts for this specific bin
+          setStep('PART');
+        } else if (step === 'PART') {
+          res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-part`, { rawQr: input, binId: currentBinId });
+          setScannedParts(prev => [...prev, res.data.partCode]);
+          if (res.data.count >= requiredParts) {
+            setMessage({ type: 'success', text: 'Bin Complete! Please scan the next Bin.' });
+            setStep('BIN');
+          }
+        }
+      } else {
+        // --- NITERA WORKFLOW ---
+        if (step === 'BIN' || showBinInput) {
+          res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin`, { rawQr: input });
+          setStep('PICK');
+        } else {
+          res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-pick`, { rawQr: input });
+          setStep('BIN');
+        }
+      }
 
-  const handlePickSubmit = async () => {
-    if (!pickInput.trim()) return;
-    try {
-      const res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-pick`, { rawQr: pickInput.trim() });
-      setDispatch(res.data);
-      setMessage({ type: 'success', text: 'Pick accepted' });
-      setPickInput('');
+      // Update main dispatch state for progress bars
+      if (res && res.data.id) setDispatch(res.data);
+      setMessage({ type: 'success', text: 'Scan accepted' });
+      setScanInput('');
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Pick scan failed' });
-      setPickInput('');
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Scan failed' });
+      setScanInput('');
     }
   };
 
@@ -128,12 +180,11 @@ export default function DispatchScreen() {
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
     
-    const lastPickLog = logs.filter(l => l.type === 'PICKLIST').pop();
+    const lastPickLog = logs.filter(l => l.type === 'PICKLIST' || l.type === 'PART').pop();
     const dispatchedAt = lastPickLog ? new Date(lastPickLog.created_at).toLocaleString('en-IN') : '—';
 
     const summary = [
       ['Dispatch No:', `DSP-${dispatch?.dispatch_number}`],
-      ['Customer ID:', 'Nittera'],
       ['Status:', dispatch?.status || 'IN_PROGRESS'],
       ['Created By:', logs[0]?.operator_name || 'System'],
       ['Created At:', new Date(dispatch?.created_at || '').toLocaleString('en-IN')],
@@ -206,11 +257,8 @@ export default function DispatchScreen() {
       if (log.result === 'FAIL') pdf.setTextColor(200, 0, 0);
       else if (log.result === 'PASS') pdf.setTextColor(0, 150, 0);
 
-      // --- PICKLIST CODE TRUNCATION LOGIC ---
       let displayCode = log.code || '—';
-      if (log.type === 'PICKLIST' && displayCode.length > 17) {
-        displayCode = displayCode.substring(0, 17) + '...';
-      }
+      if (displayCode.length > 17) displayCode = displayCode.substring(0, 17) + '...';
 
       const logData = [
         new Date(log.created_at).toLocaleString('en-IN'),
@@ -317,13 +365,34 @@ export default function DispatchScreen() {
                   <svg width="34" height="34" viewBox="0 0 34 34" fill="none"><path d="M7 17L14 24L27 10" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
                 <div style={{ color: '#78BE20', fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>{completing ? 'Completing...' : 'Batch Complete!'}</div>
-                <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '28px' }}>All bins and picks scanned successfully</div>
+                <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '28px' }}>All bins and parts scanned successfully</div>
                 <button onClick={exportPDF} style={{ padding: '12px 32px', borderRadius: '10px', border: '1px solid rgba(120,190,32,0.5)', background: 'rgba(120,190,32,0.12)', color: '#78BE20', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↓ Export PDF Report</button>
               </div>
             </div>
           ) : (
             <>
-              {showBin && (
+              {/* --- STEP 1: NX SCAN (USUI ONLY) --- */}
+              {isUsui && step === 'NX' && (
+                <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both', border: '1px solid rgba(232,168,0,0.4)', background: 'rgba(232,168,0,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(232,168,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e8a800' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>Scan NX Product QR</div>
+                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 1 of 3 · Identify the lauch product</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                    <input autoFocus type="text" placeholder="Scan NX QR..." value={scanInput} onChange={e => setScanInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleScanSubmit()} style={{ flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(232,168,0,0.3)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                    <button onClick={() => setScanInput('')} style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
+                  </div>
+                  <CameraScanner onScan={txt => setScanInput(txt)} />
+                </div>
+              )}
+
+              {/* --- STEP 2: BIN SCAN (NITERA & USUI) --- */}
+              {showBinInput && (
                 <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both', border: '1px solid rgba(232,168,0,0.4)', background: 'rgba(232,168,0,0.05)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                     <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(232,168,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e8a800' }}>
@@ -331,39 +400,71 @@ export default function DispatchScreen() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>Scan Bin Label</div>
-                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 1 of 2 · Scan the bin label QR code</div>
+                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{isUsui ? 'Step 2 of 3 · Validate Bin against NX' : 'Step 1 of 2 · Scan the bin label QR code'}</div>
                     </div>
                     <div style={{ background: 'rgba(232,168,0,0.12)', border: '1px solid rgba(232,168,0,0.25)', borderRadius: '20px', padding: '3px 12px', color: '#e8a800', fontSize: '11px', fontWeight: 600 }}>
                       {dispatch.smg_qty}/{dispatch.total_schedule_bins}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-                    <input autoFocus type="text" placeholder="Paste / scan bin QR..." value={binInput} onChange={e => setBinInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleBinSubmit()} style={{ flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(232,168,0,0.3)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-                    <button onClick={() => setBinInput('')} style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
+                    <input autoFocus type="text" placeholder="Paste / scan bin QR..." value={scanInput} onChange={e => setScanInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleScanSubmit()} style={{ flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(232,168,0,0.3)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                    <button onClick={() => setScanInput('')} style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
                   </div>
-                  <CameraScanner onScan={txt => setBinInput(txt)} />
+                  <CameraScanner onScan={txt => setScanInput(txt)} />
                 </div>
               )}
-              {!showBin && (
-                <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both', border: '1px solid rgba(120,190,32,0.4)', background: 'rgba(120,190,32,0.05)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(120,190,32,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#78BE20' }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.8"/></svg>
+
+              {/* --- STEP 3: PARTS/PICK SCAN --- */}
+              {showDetailInput && (
+                <>
+                  <div style={{ ...card, animation: 'fadeUp 0.4s ease 0.1s both', border: '1px solid rgba(120,190,32,0.4)', background: 'rgba(120,190,32,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                      <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(120,190,32,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#78BE20' }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.8"/></svg>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{isUsui ? 'Scan In-Bin Parts' : 'Scan Pick-list'}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{isUsui ? 'Step 3 of 3 · Scan individual pieces' : 'Step 2 of 2 · Scan the pick-list QR code'}</div>
+                      </div>
+                      {isUsui && (
+                        <div style={{ background: 'rgba(120,190,32,0.12)', border: '1px solid rgba(120,190,32,0.25)', borderRadius: '20px', padding: '3px 12px', color: '#78BE20', fontSize: '11px', fontWeight: 600 }}>
+                          {scannedParts.length}/{requiredParts}
+                        </div>
+                      )}
+                      {!isUsui && (
+                        <div style={{ background: 'rgba(120,190,32,0.12)', border: '1px solid rgba(120,190,32,0.25)', borderRadius: '20px', padding: '3px 12px', color: '#78BE20', fontSize: '11px', fontWeight: 600 }}>
+                          {dispatch.bin_qty}/{dispatch.total_schedule_bins}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>Scan Pick-list</div>
-                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>Step 2 of 2 · Scan the pick-list QR code</div>
-                    </div>
-                    <div style={{ background: 'rgba(120,190,32,0.12)', border: '1px solid rgba(120,190,32,0.25)', borderRadius: '20px', padding: '3px 12px', color: '#78BE20', fontSize: '11px', fontWeight: 600 }}>
-                      {dispatch.bin_qty}/{dispatch.total_schedule_bins}
-                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                      <input autoFocus type="text" placeholder={`${isUsui ? 'Scan Part QR...' : 'Paste / scan pick-list QR...'}`} value={scanInput} onChange={e => setScanInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleScanSubmit()} style={{ flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                      <button onClick={() => setScanInput('')} style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
+                    </div}
+                    <CameraScanner onScan={txt => setScanInput(txt)} />
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-                    <input autoFocus type="text" placeholder="Paste / scan pick-list QR..." value={pickInput} onChange={e => setPickInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handlePickSubmit()} style={{ flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-                    <button onClick={() => setPickInput('')} style={{ padding: '0 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
-                  </div>
-                  <CameraScanner onScan={txt => setPickInput(txt)} />
-                </div>
+
+                  {/* --- USUI PART LIST VIEW --- */}
+                  {isUsui && step === 'PART' && (
+                    <div style={{ ...card, animation: 'fadeUp 0.4s ease both' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 600, marginBottom: '10px', textTransform: 'uppercase' }}>
+                        Parts Collected: <span style={{ color: '#78BE20' }}>{scannedParts.length} / {requiredParts}</span>
+                      </div>
+                      <div style={{ maxHeight: '200px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px' }}>
+                        {scannedParts.length === 0 ? (
+                          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '12px', padding: '20px 0' }}>No parts scanned yet.</div>
+                        ) : (
+                          scannedParts.map((p, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '12px' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.8)' }}>{i + 1}. {p}</span>
+                              <span style={{ color: '#78BE20' }}>✓</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
