@@ -73,11 +73,14 @@ export default function DispatchScreen() {
 
       // Fetch the strategy to decide the workflow
       const stratRes = await axios.get(`${import.meta.env.VITE_API_BASE}/admin/customer-strategies`);
-      const matching = stratRes.data.find((a: any) => a.customer_id = res.data.dispatch.customer_id);
+      
+      // FIXED: Changed '=' to '===' for correct comparison
+      const matching = stratRes.data.find((a: any) => a.customer_id === res.data.dispatch.customer_id);
+      
       const code = matching?.strategy_code || '';
       setStrategyCode(code);
 
-      // Initialize starting step
+      // Now this will correctly trigger 'NX' for USUI customers
       if (code === 'USUI_1toMany') {
         setStep('NX');
       } else {
@@ -89,6 +92,7 @@ export default function DispatchScreen() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { loadDispatch(); }, [id]);
 
