@@ -107,26 +107,40 @@ export default function DispatchScreen() {
     window.location.href = '/wms-frontend/#/login';
   }, 10 * 60 * 1000);
 
-  const handleScanSubmit = async () => {
+   const handleScanSubmit = async () => {
     if (!scanInput.trim()) return;
     const input = scanInput.trim();
     
     try {
-      let res;
+      let res: any;
       if (isUsui) {
         // --- USUI WORKFLOW ---
         if (step === 'NX') {
           res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-nx`, { rawQr: input });
+          
+          // Update dispatch state if the server sends it, otherwise just proceed
+          if (res.data.dispatch) setDispatch(res.data.dispatch);
           setStep('BIN');
-        } else if (step === 'BIN') {
+        } 
+        else if (step === 'BIN') {
           res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin-usui`, { rawQr: input });
+          
+          // CRITICAL FIX: Update the dispatch state to fill the top summary cards
+          if (res.data.dispatch) {
+            setDispatch(res.data.dispatch);
+          }
+
           setCurrentBinId(res.data.binId);
           setRequiredParts(res.data.requiredParts);
-          setScannedParts([]); // Reset parts for this specific bin
+          setScannedParts([]); // Clear the list for the new bin
           setStep('PART');
-        } else if (step === 'PART') {
+        } 
+        else if (step === 'PART') {
           res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-part`, { rawQr: input, binId: currentBinId });
+          
           setScannedParts(prev => [...prev, res.data.partCode]);
+          
+          // Check if the bin is now complete
           if (res.data.count >= requiredParts) {
             setMessage({ type: 'success', text: 'Bin Complete! Please scan the next Bin.' });
             setStep('BIN');
@@ -136,22 +150,28 @@ export default function DispatchScreen() {
         // --- NITERA WORKFLOW ---
         if (step === 'BIN' || showBinInput) {
           res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-bin`, { rawQr: input });
+          if (res.data && res.data.id) setDispatch(res.data); // Update cards
           setStep('PICK');
         } else {
           res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-pick`, { rawQr: input });
+          if (res.data && res.data.id) setDispatch(res.data); // Update cards
           setStep('BIN');
         }
       }
 
-      // Update main dispatch state for progress bars
-      if (res && res.data.id) setDispatch(res.data);
+      // Clear input and show success message
+      setScanInput('');
       setMessage({ type: 'success', text: 'Scan accepted' });
-      setScanInput('');
+      
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Scan failed' });
       setScanInput('');
+      setMessage({ 
+        type: 'error', 
+        text: err.response?.data?.message || 'Scan failed. Please try again.' 
+      });
     }
   };
+
 
   const handleComplete = async () => {
     if (completing) return;
