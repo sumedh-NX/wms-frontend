@@ -104,7 +104,8 @@ export default function DispatchScreen() {
 
   useIdleTimer(() => {
     localStorage.removeItem('token');
-    window.location.href = '/wms-frontend/#/login';
+    // This redirect works regardless of whether you are on Render or GitHub Pages
+    window.location.href = window.location.origin + '/#/login'; 
   }, 10 * 60 * 1000);
 
    const handleScanSubmit = async () => {
