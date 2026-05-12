@@ -130,12 +130,20 @@ export default function DispatchScreen() {
         } 
         else if (step === 'PART') {
           res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${id}/scan-part`, { rawQr: input, binId: currentBinId });
+          
+          // Update state with the latest dispatch status (checks if it's now 'COMPLETED')
+          if (res.data.dispatch) {
+            setDispatch(res.data.dispatch);
+          }
+          
           setScannedParts(prev => [...prev, res.data.partCode]);
+          
           if (res.data.count >= requiredParts) {
             setMessage({ type: 'success', text: 'Bin Complete! Please scan the next Bin.' });
             setStep('BIN');
           }
         }
+
       } else {
         // Nitera Logic...
         if (step === 'BIN' || showBinInput) {
