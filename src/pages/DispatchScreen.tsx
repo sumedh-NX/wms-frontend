@@ -27,20 +27,20 @@ export default function DispatchScreen() {
   const isComplete = dispatch?.status === 'COMPLETED';
 
   const loadDispatch = async () => {
-    try {
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatch/${id}`);
-      setDispatch(res.data.dispatch);
-      setLogs(res.data.logs || []);
-      
-      const stratRes = await axios.get(`${import.meta.env.VITE_API_BASE}/admin/customer-strategies`);
-      const matching = stratRes.data.find((a: any) => a.customer_id === res.data.dispatch.customer_id);
-      setStrategyCode(matching?.strategy_code || '');
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatch/${id}`);
+    setDispatch(res.data.dispatch);
+    setLogs(res.data.logs || []);
+    
+    // FIX: Read strategy code directly from dispatch (no admin endpoint needed)
+    const code = res.data.dispatch?.strategy_code || '';
+    setStrategyCode(code);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { loadDispatch(); }, [id]);
 
