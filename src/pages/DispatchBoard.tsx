@@ -28,40 +28,44 @@ export default function DispatchBoard() {
   const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  const fetchDispatches = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    setLoading(true);
-    try {
-      let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
-      if (dateRange.start && dateRange.end) {
-        url += `&startDate=${dateRange.start}&endDate=${dateRange.end}`;
-      }
-
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (!response.ok) throw new Error('Network response was not ok');
-      
-      const data = await response.json();
-      setDispatches(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Fetch error:", error);
-      setDispatches([]);
-    } finally {
-      setLoading(false);
+// AFTER
+const fetchDispatches = async (overrideDates?: { start: string; end: string }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  setLoading(true);
+  
+  // Use override if provided, otherwise use state
+  // This fixes the async setState bug in handleClear
+  const dates = overrideDates !== undefined ? overrideDates : dateRange;
+  
+  try {
+    let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
+    if (dates.start && dates.end) {
+      url += `&startDate=${dates.start}&endDate=${dates.end}`;
     }
-  };
+    
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Network response was not ok');
+    const data = await response.json();
+    setDispatches(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error("Fetch error:", error);
+    setDispatches([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchDispatches();
   }, [customerId]);
 
   const handleClear = () => {
-    setDateRange({ start: '', end: '' });
-    fetchDispatches();
+    const cleared = { start: '', end: '' };
+    setDateRange(cleared);                  // Update UI inputs
+    fetchDispatches(cleared);               // Fetch with cleared values immediately
   };
 
   const handleNew = async () => {
