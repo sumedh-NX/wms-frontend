@@ -28,20 +28,21 @@ export default function DispatchBoard() {
   const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  // FIXED: fetchDispatches accepts overrideDates parameter to bypass React async state bug
-  const fetchDispatches = async (overrideDates?: { start: string; end: string }) => {
+  // Core fetch function that uses the dateRange passed to it (or state)
+  const fetchDispatches = async (startDate?: string, endDate?: string) => {
     const token = localStorage.getItem('token');
     if (!token) return;
     setLoading(true);
     
-    // Use override if provided, otherwise use state
-    // This fixes the async setState bug in handleClear
-    const dates = overrideDates !== undefined ? overrideDates : dateRange;
-    
     try {
       let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
-      if (dates.start && dates.end) {
-        url += `&startDate=${dates.start}&endDate=${dates.end}`;
+      
+      // Use passed params if available, otherwise use state
+      const start = startDate !== undefined ? startDate : dateRange.start;
+      const end = endDate !== undefined ? endDate : dateRange.end;
+      
+      if (start && end) {
+        url += `&startDate=${start}&endDate=${end}`;
       }
       
       const response = await fetch(url, {
@@ -62,10 +63,14 @@ export default function DispatchBoard() {
     fetchDispatches();
   }, [customerId]);
 
+  // When user clicks Filter button, pass the current date inputs
+  const handleFilter = () => {
+    fetchDispatches(dateRange.start, dateRange.end);
+  };
+
   const handleClear = () => {
-    const cleared = { start: '', end: '' };
-    setDateRange(cleared);                  // Update UI inputs
-    fetchDispatches(cleared);               // Fetch with cleared values immediately
+    setDateRange({ start: '', end: '' });
+    fetchDispatches('', ''); // Clear the filter
   };
 
   const handleNew = async () => {
@@ -180,7 +185,7 @@ export default function DispatchBoard() {
             <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
             <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>to</span>
             <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', outline: 'none' }} />
-            <button onClick={fetchDispatches} style={{ background: '#78BE20', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>Filter</button>
+            <button onClick={handleFilter} style={{ background: '#78BE20', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>Filter</button>
             <button onClick={handleClear} style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '7px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Clear</button>
           </div>
 
