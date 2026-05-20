@@ -28,35 +28,35 @@ export default function DispatchBoard() {
   const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-// AFTER
-const fetchDispatches = async (overrideDates?: { start: string; end: string }) => {
-  const token = localStorage.getItem('token');
-  if (!token) return;
-  setLoading(true);
-  
-  // Use override if provided, otherwise use state
-  // This fixes the async setState bug in handleClear
-  const dates = overrideDates !== undefined ? overrideDates : dateRange;
-  
-  try {
-    let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
-    if (dates.start && dates.end) {
-      url += `&startDate=${dates.start}&endDate=${dates.end}`;
-    }
+  // FIXED: fetchDispatches accepts overrideDates parameter to bypass React async state bug
+  const fetchDispatches = async (overrideDates?: { start: string; end: string }) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setLoading(true);
     
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.json();
-    setDispatches(Array.isArray(data) ? data : []);
-  } catch (error) {
-    console.error("Fetch error:", error);
-    setDispatches([]);
-  } finally {
-    setLoading(false);
-  }
-};
+    // Use override if provided, otherwise use state
+    // This fixes the async setState bug in handleClear
+    const dates = overrideDates !== undefined ? overrideDates : dateRange;
+    
+    try {
+      let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
+      if (dates.start && dates.end) {
+        url += `&startDate=${dates.start}&endDate=${dates.end}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      setDispatches(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Fetch error:", error);
+      setDispatches([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchDispatches();
@@ -209,7 +209,11 @@ const fetchDispatches = async (overrideDates?: { start: string; end: string }) =
               Loading...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>No dispatches found.</div>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>
+              {dateRange.start && dateRange.end 
+                ? `No dispatches found for ${dateRange.start} to ${dateRange.end}.` 
+                : 'No dispatches found.'}
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {/* TABLE HEADER - UPDATED WITH SCHEDULE BINS */}
