@@ -9,7 +9,7 @@ const KEYFRAMES = `
 `;
 
 export default function CustomerSelect() {
-  const { logout, user } = useAuth(); // Added 'user' here for role check
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<any[]>([]);
   const [selected, setSelected] = useState('');
@@ -33,7 +33,9 @@ export default function CustomerSelect() {
   const handleContinue = () => {
     if (!selected) return;
     setContinuing(true);
-    setTimeout(() => navigate(`/dispatches?customerId=${selected}`), 300);
+    const selectedCustomer = customers.find(c => String(c.id) === selected);
+    const name = encodeURIComponent(selectedCustomer?.name || '');
+    setTimeout(() => navigate(`/dispatches?customerId=${selected}&customerName=${name}`), 300);
   };
 
   const page: React.CSSProperties = {
@@ -81,13 +83,13 @@ export default function CustomerSelect() {
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               {user?.role === 'admin' && (
-                <button onClick={() => navigate('/admin')} 
+                <button onClick={() => navigate('/admin')}
                   style={{ background: 'rgba(120,190,32,0.1)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '8px', color: '#78BE20', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-                  ⚙️ Admin
+                  Admin
                 </button>
               )}
               <button onClick={logout}
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
                 onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.10)')}
                 onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
                 Sign out

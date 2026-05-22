@@ -22,14 +22,15 @@ export default function DispatchBoard() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const customerId = params.get('customerId');
+  const customerId   = params.get('customerId');
+  const customerName = decodeURIComponent(params.get('customerName') || '');
 
   const [dispatches, setDispatches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [filter, setFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [loading, setLoading]       = useState(true);
+  const [creating, setCreating]     = useState(false);
+  const [filter, setFilter]         = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
+  const [dateRange, setDateRange]   = useState({ start: '', end: '' });
+  const [isMobile, setIsMobile]     = useState(window.innerWidth <= 768);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -41,24 +42,20 @@ export default function DispatchBoard() {
     const token = localStorage.getItem('token');
     if (!token) return;
     setLoading(true);
-
     try {
       let url = `${import.meta.env.VITE_API_BASE}/dispatch?customerId=${customerId}`;
       const start = startDate !== undefined ? startDate : dateRange.start;
-      const end = endDate !== undefined ? endDate : dateRange.end;
+      const end   = endDate   !== undefined ? endDate   : dateRange.end;
       if (start && end) url += `&startDate=${start}&endDate=${end}`;
 
       const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       const list = Array.isArray(data) ? data : [];
       setDispatches(list);
 
       if (!start && !end) {
-        sessionStorage.setItem(
-          `dispatch_cache_${customerId}`,
-          JSON.stringify({ ts: Date.now(), data: list })
-        );
+        sessionStorage.setItem(`dispatch_cache_${customerId}`, JSON.stringify({ ts: Date.now(), data: list }));
       }
     } catch (error) {
       console.error('Fetch error:', error);
@@ -84,10 +81,7 @@ export default function DispatchBoard() {
             .then(d => {
               const list = Array.isArray(d) ? d : [];
               setDispatches(list);
-              sessionStorage.setItem(
-                `dispatch_cache_${customerId}`,
-                JSON.stringify({ ts: Date.now(), data: list })
-              );
+              sessionStorage.setItem(`dispatch_cache_${customerId}`, JSON.stringify({ ts: Date.now(), data: list }));
             })
             .catch(() => {});
           return;
@@ -98,11 +92,7 @@ export default function DispatchBoard() {
   }, [customerId]);
 
   const handleFilter = () => fetchDispatches(dateRange.start, dateRange.end);
-
-  const handleClear = () => {
-    setDateRange({ start: '', end: '' });
-    fetchDispatches('', '');
-  };
+  const handleClear  = () => { setDateRange({ start: '', end: '' }); fetchDispatches('', ''); };
 
   const handleNew = async () => {
     const token = localStorage.getItem('token');
@@ -116,23 +106,24 @@ export default function DispatchBoard() {
       });
       const data = await response.json();
       sessionStorage.removeItem(`dispatch_cache_${customerId}`);
-      navigate(`/dispatch/${data.id}?customerId=${customerId}`);
+      const nameParam = customerName ? `&customerName=${encodeURIComponent(customerName)}` : '';
+      navigate(`/dispatch/${data.id}?customerId=${customerId}${nameParam}`);
     } catch (e) {
       console.error('Creation error:', e);
       setCreating(false);
     }
   };
 
-  const filtered = dispatches.filter(d => filter === 'ALL' || d.status === filter);
+  const filtered        = dispatches.filter(d => filter === 'ALL' || d.status === filter);
   const inProgressCount = dispatches.filter(d => d.status === 'IN_PROGRESS').length;
-  const completedCount = dispatches.filter(d => d.status === 'COMPLETED').length;
-  const totalCount = dispatches.length;
+  const completedCount  = dispatches.filter(d => d.status === 'COMPLETED').length;
+  const totalCount      = dispatches.length;
 
   const statusBadge = (status: string): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: '20px',
     fontSize: '11px', fontWeight: 600,
     background: status === 'COMPLETED' ? 'rgba(120,190,32,0.15)' : 'rgba(255,185,0,0.12)',
-    color: status === 'COMPLETED' ? '#78BE20' : '#e8a800',
+    color:      status === 'COMPLETED' ? '#78BE20'                : '#e8a800',
     border: `1px solid ${status === 'COMPLETED' ? 'rgba(120,190,32,0.3)' : 'rgba(255,185,0,0.25)'}`,
     whiteSpace: 'nowrap',
   });
@@ -141,7 +132,7 @@ export default function DispatchBoard() {
     padding: '7px 16px', borderRadius: '20px', cursor: 'pointer',
     fontFamily: 'inherit', fontSize: isMobile ? '13px' : '12.5px', fontWeight: 600,
     background: filter === val ? 'rgba(120,190,32,0.18)' : 'transparent',
-    color: filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
+    color:      filter === val ? '#78BE20' : 'rgba(255,255,255,0.4)',
     border: filter === val ? '1px solid rgba(120,190,32,0.35)' : '1px solid transparent',
   });
 
@@ -149,6 +140,7 @@ export default function DispatchBoard() {
     <>
       <style>{KEYFRAMES}</style>
 
+      {/* Full-screen creating overlay */}
       {creating && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(13,13,48,0.93)',
@@ -167,16 +159,18 @@ export default function DispatchBoard() {
           <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(120,190,32,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(120,190,32,0.03) 1px,transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none', zIndex: 0 }} />
         )}
 
+        {/* Sticky nav bar */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 10,
-          background: isMobile ? '#161640' : 'rgba(27,27,75,0.85)',
+          background: isMobile ? '#161640' : 'rgba(27,27,75,0.88)',
           backdropFilter: isMobile ? 'none' : 'blur(20px)',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
           padding: isMobile ? '0 12px' : '0 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          height: isMobile ? '52px' : '60px',
+          height: isMobile ? '56px' : '62px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Left: logo + customer badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#78BE20,#5a9218)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M3 9L12 4L21 9V20H3V9Z" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
@@ -187,11 +181,29 @@ export default function DispatchBoard() {
               <div style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>NX Logistics</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', letterSpacing: '0.8px', textTransform: 'uppercase' }}>WMS Outbound</div>
             </div>
+            {customerName && (
+              <>
+                <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.12)', margin: '0 4px', flexShrink: 0 }} />
+                <div style={{
+                  background: 'rgba(120,190,32,0.15)',
+                  border: '1px solid rgba(120,190,32,0.4)',
+                  borderRadius: '8px', padding: '4px 10px',
+                  color: '#78BE20', fontSize: isMobile ? '12px' : '13px', fontWeight: 700,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isMobile ? '100px' : '200px',
+                }}>
+                  {customerName}
+                </div>
+              </>
+            )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>← Customers</button>
+
+          {/* Right: actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {isMobile ? '←' : '← Customers'}
+            </button>
             {user?.role === 'admin' && !isMobile && (
-              <button onClick={() => navigate('/admin')} style={{ background: 'rgba(120,190,32,0.1)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '8px', color: '#78BE20', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>⚙️ Admin</button>
+              <button onClick={() => navigate('/admin')} style={{ background: 'rgba(120,190,32,0.1)', border: '1px solid rgba(120,190,32,0.3)', borderRadius: '8px', color: '#78BE20', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Admin</button>
             )}
             <button onClick={logout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
           </div>
@@ -199,10 +211,18 @@ export default function DispatchBoard() {
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '16px 12px' : '28px 20px' }}>
 
+          {/* Page title */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', animation: 'fadeUp 0.4s ease both' }}>
             <div>
+              {customerName && (
+                <div style={{ color: '#78BE20', fontSize: isMobile ? '11px' : '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>
+                  {customerName}
+                </div>
+              )}
               <h1 style={{ color: '#fff', fontSize: isMobile ? '22px' : '26px', fontWeight: 700, margin: 0 }}>Dispatches</h1>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '3px 0 0' }}>Customer #{customerId} · {totalCount} total</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '3px 0 0' }}>
+                {customerName || `Customer #${customerId}`} · {totalCount} total
+              </p>
             </div>
             <button
               onClick={handleNew}
@@ -222,27 +242,23 @@ export default function DispatchBoard() {
             </button>
           </div>
 
+          {/* Date filter */}
           <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)', animation: 'fadeUp 0.4s ease 0.1s both' }}>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>Dispatch Date Range</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="date"
-                value={dateRange.start}
+              <input type="date" value={dateRange.start}
                 onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
-                style={{ flex: '1 1 140px', minWidth: '130px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '9px 10px', fontSize: '14px', outline: 'none' }}
-              />
+                style={{ flex: '1 1 140px', minWidth: '130px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '9px 10px', fontSize: '14px', outline: 'none' }} />
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>to</span>
-              <input
-                type="date"
-                value={dateRange.end}
+              <input type="date" value={dateRange.end}
                 onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
-                style={{ flex: '1 1 140px', minWidth: '130px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '9px 10px', fontSize: '14px', outline: 'none' }}
-              />
+                style={{ flex: '1 1 140px', minWidth: '130px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '9px 10px', fontSize: '14px', outline: 'none' }} />
               <button onClick={handleFilter} style={{ padding: '9px 20px', background: '#78BE20', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', fontFamily: 'inherit' }}>Filter</button>
-              <button onClick={handleClear} style={{ padding: '9px 14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', fontFamily: 'inherit' }}>Clear</button>
+              <button onClick={handleClear}  style={{ padding: '9px 14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', fontFamily: 'inherit' }}>Clear</button>
             </div>
           </div>
 
+          {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px', animation: 'fadeUp 0.4s ease 0.2s both' }}>
             {[
               { label: 'Total',       value: totalCount,      color: 'rgba(255,255,255,0.08)', textColor: '#fff'    },
@@ -256,6 +272,7 @@ export default function DispatchBoard() {
             ))}
           </div>
 
+          {/* Filter tabs */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', animation: 'fadeUp 0.4s ease 0.3s both' }}>
             {(['ALL', 'IN_PROGRESS', 'COMPLETED'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)} style={filterBtn(f)}>
@@ -264,6 +281,7 @@ export default function DispatchBoard() {
             ))}
           </div>
 
+          {/* List */}
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
               <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginRight: '12px' }} />
@@ -279,9 +297,11 @@ export default function DispatchBoard() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filtered.map((d, i) => (
-                <div
-                  key={d.id}
-                  onClick={() => navigate(`/dispatch/${d.id}?customerId=${customerId}`)}
+                <div key={d.id}
+                  onClick={() => {
+                    const nameParam = customerName ? `&customerName=${encodeURIComponent(customerName)}` : '';
+                    navigate(`/dispatch/${d.id}?customerId=${customerId}${nameParam}`);
+                  }}
                   style={{
                     background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.07)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid rgba(255,255,255,0.1)',
@@ -330,9 +350,11 @@ export default function DispatchBoard() {
                 <div style={{ width: '100px', textAlign: 'right' }}>Status</div>
               </div>
               {filtered.map((d, i) => (
-                <div
-                  key={d.id}
-                  onClick={() => navigate(`/dispatch/${d.id}?customerId=${customerId}`)}
+                <div key={d.id}
+                  onClick={() => {
+                    const nameParam = customerName ? `&customerName=${encodeURIComponent(customerName)}` : '';
+                    navigate(`/dispatch/${d.id}?customerId=${customerId}${nameParam}`);
+                  }}
                   style={{
                     display: 'flex', alignItems: 'center',
                     background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)',
@@ -343,7 +365,7 @@ export default function DispatchBoard() {
                     animation: `rowIn 0.3s ease ${i * 0.03}s both`,
                   }}
                   onMouseOver={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                  onMouseOut={e => { (e.currentTarget as HTMLDivElement).style.background = d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)'; }}
+                  onMouseOut={e =>  { (e.currentTarget as HTMLDivElement).style.background = d.status === 'COMPLETED' ? 'rgba(120,190,32,0.05)' : 'rgba(255,255,255,0.04)'; }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                     <div style={{ width: '100px', fontWeight: 700, color: '#fff', fontSize: '15px' }}>#{d.dispatch_number}</div>

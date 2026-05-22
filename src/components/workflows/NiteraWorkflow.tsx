@@ -9,22 +9,46 @@ interface NiteraWorkflowProps {
   onMessage: (msg: { type: 'error' | 'success'; text: string }) => void;
 }
 
+const STEP_CFG = {
+  BIN: {
+    step: 1, total: 2,
+    label: 'SCAN BIN LABEL',
+    hint:  'Point scanner at the Bin QR label',
+    color: '#E65C00',
+    light: 'rgba(230,92,0,0.08)',
+    border: 'rgba(230,92,0,0.5)',
+    placeholder: 'Scan bin QR code...',
+  },
+  PICK: {
+    step: 2, total: 2,
+    label: 'SCAN PICK-LIST',
+    hint:  'Point scanner at the Pick-list QR code',
+    color: '#5a9218',
+    light: 'rgba(120,190,32,0.08)',
+    border: 'rgba(120,190,32,0.5)',
+    placeholder: 'Scan pick-list QR code...',
+  },
+};
+
 export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate, onMessage }: NiteraWorkflowProps) {
   const [scanInput, setScanInput] = useState('');
-  
+
   const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
-  
+  const cfg = showBin ? STEP_CFG.BIN : STEP_CFG.PICK;
+
+  const counter = showBin
+    ? `${dispatch?.smg_qty ?? 0} / ${dispatch?.total_schedule_bins ?? '—'} bins`
+    : `${dispatch?.bin_qty ?? 0} / ${dispatch?.total_schedule_bins ?? '—'} picks`;
+
   const handleSubmit = async () => {
     if (!scanInput.trim()) return;
     const input = scanInput.trim();
-    
     try {
       const endpoint = showBin ? 'scan-bin' : 'scan-pick';
       const res = await axios.post(
-        `${import.meta.env.VITE_API_BASE}/dispatch/${dispatchId}/${endpoint}`, 
+        `${import.meta.env.VITE_API_BASE}/dispatch/${dispatchId}/${endpoint}`,
         { rawQr: input }
       );
-      
       if (res.data) onDispatchUpdate(res.data);
       onMessage({ type: 'success', text: `${showBin ? 'Bin' : 'Pick'} accepted` });
       setScanInput('');
@@ -33,55 +57,87 @@ export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate,
       setScanInput('');
     }
   };
-  
+
   return (
-    <div style={{ 
-      background: 'rgba(255,255,255,0.04)', 
-      border: `1px solid ${showBin ? 'rgba(232,168,0,0.4)' : 'rgba(120,190,32,0.4)'}`, 
-      borderRadius: '14px', padding: '20px', marginBottom: '16px',
-      animation: 'fadeUp 0.4s ease 0.1s both'
+    <div style={{
+      background: cfg.light,
+      border: `2px solid ${cfg.border}`,
+      borderRadius: '14px',
+      overflow: 'hidden',
+      marginBottom: '16px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+      {/* Coloured step banner */}
+      <div style={{
+        background: cfg.color,
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', gap: '12px',
+      }}>
+        {/* Step number badge */}
+        <div style={{
+          width: '38px', height: '38px', borderRadius: '50%',
+          background: 'rgba(255,255,255,0.22)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '20px', fontWeight: 800, color: '#fff', flexShrink: 0,
+          letterSpacing: '-1px',
+        }}>
+          {cfg.step}
+        </div>
+
         <div style={{ flex: 1 }}>
-          <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>
-            {showBin ? 'Scan Bin Label' : 'Scan Pick-list'}
+          <div style={{ color: '#fff', fontSize: '16px', fontWeight: 800, letterSpacing: '0.5px' }}>
+            {cfg.label}
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>
-            {showBin ? 'Step 1 of 2' : 'Step 2 of 2'}
+          <div style={{ color: 'rgba(255,255,255,0.82)', fontSize: '11px', marginTop: '2px' }}>
+            {cfg.hint}
           </div>
         </div>
-        <div style={{ 
-          background: showBin ? 'rgba(232,168,0,0.12)' : 'rgba(120,190,32,0.12)', 
-          borderRadius: '20px', padding: '3px 12px', 
-          color: showBin ? '#e8a800' : '#78BE20', fontSize: '11px', fontWeight: 600 
+
+        <div style={{
+          background: 'rgba(255,255,255,0.20)',
+          borderRadius: '20px', padding: '4px 12px',
+          color: '#fff', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
         }}>
-          {showBin ? `${dispatch.smg_qty}/${dispatch.total_schedule_bins}` : `${dispatch.bin_qty}/${dispatch.total_schedule_bins}`}
+          STEP {cfg.step} / {cfg.total}
         </div>
       </div>
-      
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-        <input 
-          autoFocus type="text" 
-          placeholder={showBin ? "Scan bin QR..." : "Scan pick-list QR..."}
-          value={scanInput} 
-          onChange={e => setScanInput(e.target.value)} 
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()} 
-          style={{ 
-            flex: 1, padding: '12px 14px', background: 'rgba(0,0,0,0.2)', 
-            border: `1px solid ${showBin ? 'rgba(232,168,0,0.3)' : 'rgba(120,190,32,0.3)'}`, 
-            borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none' 
-          }} 
+
+      {/* Progress counter */}
+      <div style={{
+        padding: '10px 16px 0',
+        display: 'flex', alignItems: 'center', gap: '8px',
+      }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+        <span style={{ color: cfg.color, fontSize: '13px', fontWeight: 700 }}>{counter}</span>
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: '10px 16px', display: 'flex', gap: '8px' }}>
+        <input
+          autoFocus type="text"
+          placeholder={cfg.placeholder}
+          value={scanInput}
+          onChange={e => setScanInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          style={{
+            flex: 1, padding: '12px 14px',
+            background: 'rgba(0,0,0,0.22)',
+            border: `1.5px solid ${cfg.border}`,
+            borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none',
+          }}
         />
-        <button 
-          onClick={() => setScanInput('')} 
-          style={{ 
-            padding: '0 14px', background: 'rgba(255,255,255,0.06)', 
-            border: '1px solid rgba(255,255,255,0.10)', borderRadius: '10px', 
-            color: 'rgba(255,255,255,0.5)', cursor: 'pointer' 
+        <button
+          onClick={() => setScanInput('')}
+          style={{
+            padding: '0 14px', background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px',
+            color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '18px',
           }}
         >✕</button>
       </div>
-      <CameraScanner onScan={txt => setScanInput(txt)} />
+
+      <div style={{ padding: '0 16px 16px' }}>
+        <CameraScanner onScan={txt => setScanInput(txt)} />
+      </div>
     </div>
   );
 }
