@@ -78,14 +78,14 @@ function footer(pdf: jsPDF): void {
   }
 }
 
-/** Draw 3 signature boxes: Scanned by | Confirmed By | Approved By */
+/** Draw 3 compact signature boxes: Scanned by | Confirmed By | Approved By */
 function drawSignatureBoxes(pdf: jsPDF, y: number): number {
-  y = checkPage(pdf, y, 42);
-  y += 8;
+  y = checkPage(pdf, y, 30);
+  y += 5;
 
   const gap  = 6;
   const boxW = (COL_W - gap * 2) / 3;
-  const boxH = 28;
+  const boxH = 18;
   const labels = ['Scanned by', 'Confirmed By', 'Approved By'];
 
   labels.forEach((label, i) => {
@@ -96,27 +96,27 @@ function drawSignatureBoxes(pdf: jsPDF, y: number): number {
     pdf.roundedRect(x, y, boxW, boxH, 2, 2, 'FD');
 
     // Label heading
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(...C.DARK);
-    pdf.text(label, x + boxW / 2, y + 7, { align: 'center' });
+    pdf.text(label, x + boxW / 2, y + 5, { align: 'center' });
 
     // Thin line under heading
     pdf.setDrawColor(210, 210, 210);
-    pdf.line(x + 3, y + 10, x + boxW - 3, y + 10);
+    pdf.line(x + 3, y + 7, x + boxW - 3, y + 7);
 
     // Signature line near bottom
     pdf.setDrawColor(150, 150, 150);
-    pdf.line(x + 5, y + boxH - 6, x + boxW - 5, y + boxH - 6);
+    pdf.line(x + 5, y + boxH - 4, x + boxW - 5, y + boxH - 4);
 
-    // Caption below line
-    pdf.setFontSize(6);
+    // Caption
+    pdf.setFontSize(5.5);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(...C.LGRAY);
-    pdf.text('Signature & Stamp', x + boxW / 2, y + boxH - 2, { align: 'center' });
+    pdf.text('Signature & Stamp', x + boxW / 2, y + boxH - 1, { align: 'center' });
   });
 
-  return y + boxH + 6;
+  return y + boxH + 4;
 }
 
 // ─────────────────────────────────────────────
@@ -129,7 +129,6 @@ function drawReportHeader(
   logs: any[],
   customer: string
 ): number {
-  // Green top banner
   pdf.setFillColor(...C.GREEN);
   pdf.rect(0, 0, PAGE_W, 14, 'F');
   pdf.setFontSize(14);
@@ -156,22 +155,22 @@ function drawReportHeader(
   pdf.setFillColor(...C.BG);
   pdf.roundedRect(MARGIN, y, COL_W, 28, 2, 2, 'F');
 
-  kv(pdf, col1 + 4, y + 6,  'DISPATCH NO',    `DSP-${safe(dispatch?.dispatch_number)}`);
-  kv(pdf, col2,     y + 6,  'STATUS',          safe(dispatch?.status));
-  kv(pdf, col3,     y + 6,  'CUSTOMER',        customer);
+  kv(pdf, col1 + 4, y + 6,  'DISPATCH NO',   `DSP-${safe(dispatch?.dispatch_number)}`);
+  kv(pdf, col2,     y + 6,  'STATUS',         safe(dispatch?.status));
+  kv(pdf, col3,     y + 6,  'CUSTOMER',       customer);
 
-  kv(pdf, col1 + 4, y + 18, 'OPERATOR',        createdBy);
-  kv(pdf, col2,     y + 18, 'CREATED AT',      fmtDate(dispatch?.created_at));
-  kv(pdf, col3,     y + 18, 'DISPATCHED AT',   dispatchedAt);
+  kv(pdf, col1 + 4, y + 18, 'OPERATOR',       createdBy);
+  kv(pdf, col2,     y + 18, 'CREATED AT',     fmtDate(dispatch?.created_at));
+  kv(pdf, col3,     y + 18, 'DISPATCHED AT',  dispatchedAt);
 
   y += 32;
 
   pdf.setFillColor(...C.BG);
   pdf.roundedRect(MARGIN, y, COL_W, 14, 2, 2, 'F');
 
-  kv(pdf, col1 + 4, y + 6, 'NAGARE TIME',  safe(dispatch?.ref_supply_date));
-  kv(pdf, col2,     y + 6, 'SUPPLY DATE',  safe(dispatch?.ref_schedule_sent_date));
-  kv(pdf, col3,     y + 6, 'SCHEDULE NO',  safe(dispatch?.ref_schedule_number));
+  kv(pdf, col1 + 4, y + 6, 'NAGARE TIME', safe(dispatch?.ref_supply_date));
+  kv(pdf, col2,     y + 6, 'SUPPLY DATE', safe(dispatch?.ref_schedule_sent_date));
+  kv(pdf, col3,     y + 6, 'SCHEDULE NO', safe(dispatch?.ref_schedule_number));
 
   y += 18;
   return y;
@@ -266,14 +265,14 @@ export function exportNiteraPDF(
   y = sectionHeader(pdf, y, 'Dispatch Summary');
 
   const sumCols = [
-    { l: 'Product Code',   x: MARGIN },
-    { l: 'Schedule No',    x: MARGIN + 30 },
-    { l: 'Supply Qty',     x: MARGIN + 72 },
-    { l: 'Total Bins',     x: MARGIN + 92 },
-    { l: 'Bins Scanned',   x: MARGIN + 110 },
-    { l: 'Picks Scanned',  x: MARGIN + 130 },
-    { l: 'Case Pack',      x: MARGIN + 152 },
-    { l: 'Status',         x: MARGIN + 170 },
+    { l: 'Product Code',  x: MARGIN },
+    { l: 'Schedule No',   x: MARGIN + 30 },
+    { l: 'Supply Qty',    x: MARGIN + 72 },
+    { l: 'Total Bins',    x: MARGIN + 92 },
+    { l: 'Bins Scanned',  x: MARGIN + 110 },
+    { l: 'Picks Scanned', x: MARGIN + 130 },
+    { l: 'Case Pack',     x: MARGIN + 152 },
+    { l: 'Status',        x: MARGIN + 170 },
   ];
 
   pdf.setFillColor(...C.ROW_HEAD);
@@ -325,28 +324,17 @@ export function exportNiteraPDF(
   y += 7;
 
   if (bins.length === 0) {
-    pdf.setFontSize(7.5);
-    pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(...C.LGRAY);
+    pdf.setFontSize(7.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(...C.LGRAY);
     pdf.text('No bins scanned.', MARGIN + 4, y + 4);
     y += 10;
   } else {
     bins.forEach((bin, i) => {
       y = checkPage(pdf, y, 7);
       if (i % 2 === 1) { pdf.setFillColor(...C.ROW_ALT); pdf.rect(MARGIN, y, COL_W, 6, 'F'); }
-      pdf.setFontSize(6.5);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(...C.DARK);
-      const row = [
-        String(i + 1),
-        safe(bin.bin_number),
-        safe(bin.product_code),
-        safe(bin.case_pack),
-        safe(bin.supply_quantity),
-        safe(bin.supply_date),
-        safe(bin.invoice_number),
-        fmtDate(bin.created_at),
-      ];
+      pdf.setFontSize(6.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...C.DARK);
+      const row = [String(i + 1), safe(bin.bin_number), safe(bin.product_code),
+        safe(bin.case_pack), safe(bin.supply_quantity), safe(bin.supply_date),
+        safe(bin.invoice_number), fmtDate(bin.created_at)];
       binCols.forEach((c, ci) => pdf.text(row[ci], c.x + 1, y + 4.5));
       y += 6;
     });
@@ -374,25 +362,16 @@ export function exportNiteraPDF(
   y += 7;
 
   if (picks.length === 0) {
-    pdf.setFontSize(7.5);
-    pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(...C.LGRAY);
+    pdf.setFontSize(7.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(...C.LGRAY);
     pdf.text('No picks scanned.', MARGIN + 4, y + 4);
     y += 10;
   } else {
     picks.forEach((pick, i) => {
       y = checkPage(pdf, y, 7);
       if (i % 2 === 1) { pdf.setFillColor(...C.ROW_ALT); pdf.rect(MARGIN, y, COL_W, 6, 'F'); }
-      pdf.setFontSize(6.5);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(...C.DARK);
-      const row = [
-        String(i + 1),
-        safe(pick.pick_code),
-        safe(pick.product_code),
-        safe(pick.case_pack),
-        fmtDate(pick.created_at),
-      ];
+      pdf.setFontSize(6.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...C.DARK);
+      const row = [String(i + 1), safe(pick.pick_code), safe(pick.product_code),
+        safe(pick.case_pack), fmtDate(pick.created_at)];
       pickCols.forEach((c, ci) => pdf.text(row[ci], c.x + 1, y + 4.5));
       y += 6;
     });
@@ -426,14 +405,14 @@ export function exportUsuiPDF(
   y = sectionHeader(pdf, y, 'Dispatch Summary');
 
   const sumCols = [
-    { l: 'Product Code',   x: MARGIN },
-    { l: 'Schedule No',    x: MARGIN + 30 },
-    { l: 'Supply Qty',     x: MARGIN + 72 },
-    { l: 'Total Bins',     x: MARGIN + 92 },
-    { l: 'Parts / Bin',    x: MARGIN + 110 },
-    { l: 'Total Parts',    x: MARGIN + 130 },
-    { l: 'Bins Scanned',   x: MARGIN + 152 },
-    { l: 'Status',         x: MARGIN + 170 },
+    { l: 'Product Code',  x: MARGIN },
+    { l: 'Schedule No',   x: MARGIN + 30 },
+    { l: 'Supply Qty',    x: MARGIN + 72 },
+    { l: 'Total Bins',    x: MARGIN + 92 },
+    { l: 'Parts / Bin',   x: MARGIN + 110 },
+    { l: 'Total Parts',   x: MARGIN + 130 },
+    { l: 'Bins Scanned',  x: MARGIN + 152 },
+    { l: 'Status',        x: MARGIN + 170 },
   ];
 
   pdf.setFillColor(...C.ROW_HEAD);
@@ -447,22 +426,16 @@ export function exportUsuiPDF(
   const totalParts = parts.length;
   const partsPerBin = dispatch?.ref_case_pack || '—';
   const expectedTotal = dispatch?.total_schedule_bins && dispatch?.ref_case_pack
-    ? dispatch.total_schedule_bins * dispatch.ref_case_pack
-    : '—';
+    ? dispatch.total_schedule_bins * dispatch.ref_case_pack : '—';
 
   pdf.setFillColor(...C.ROW_ALT);
   pdf.rect(MARGIN, y, COL_W, 6, 'F');
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7); pdf.setFont('helvetica', 'normal');
   const sumData = [
-    safe(dispatch?.ref_product_code),
-    safe(dispatch?.ref_schedule_number),
-    safe(dispatch?.supply_quantity),
-    safe(dispatch?.total_schedule_bins),
-    safe(partsPerBin),
-    `${totalParts} / ${safe(expectedTotal)}`,
-    safe(dispatch?.smg_qty),
-    safe(dispatch?.status),
+    safe(dispatch?.ref_product_code), safe(dispatch?.ref_schedule_number),
+    safe(dispatch?.supply_quantity), safe(dispatch?.total_schedule_bins),
+    safe(partsPerBin), `${totalParts} / ${safe(expectedTotal)}`,
+    safe(dispatch?.smg_qty), safe(dispatch?.status),
   ];
   sumCols.forEach((c, i) => pdf.text(sumData[i], c.x + 1, y + 4.5));
   y += 10;
@@ -472,9 +445,7 @@ export function exportUsuiPDF(
   y = sectionHeader(pdf, y, `Bin Details — ${bins.length} Bins, ${totalParts} Parts Total`);
 
   if (bins.length === 0) {
-    pdf.setFontSize(7.5);
-    pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(...C.LGRAY);
+    pdf.setFontSize(7.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(...C.LGRAY);
     pdf.text('No bins scanned.', MARGIN + 4, y + 4);
     y += 10;
   } else {
@@ -483,12 +454,9 @@ export function exportUsuiPDF(
       const binComplete = binParts.length >= (dispatch?.ref_case_pack || 0);
 
       y = checkPage(pdf, y, 14);
-
       pdf.setFillColor(binComplete ? 210 : 255, binComplete ? 240 : 230, binComplete ? 210 : 210);
       pdf.rect(MARGIN, y, COL_W, 8, 'F');
-      pdf.setFontSize(7.5);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(...C.DARK);
+      pdf.setFontSize(7.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...C.DARK);
       pdf.text(
         `Bin ${binIdx + 1}: ${safe(bin.bin_number)}   |   Product: ${safe(bin.product_code)}   |   Parts: ${binParts.length}/${safe(dispatch?.ref_case_pack)}   |   Supply Date: ${safe(bin.supply_date)}   |   Status: ${binComplete ? 'COMPLETE' : 'INCOMPLETE'}`,
         MARGIN + 2, y + 5.5
@@ -497,9 +465,7 @@ export function exportUsuiPDF(
 
       if (binParts.length === 0) {
         y = checkPage(pdf, y, 6);
-        pdf.setFontSize(6.5);
-        pdf.setFont('helvetica', 'italic');
-        pdf.setTextColor(...C.LGRAY);
+        pdf.setFontSize(6.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(...C.LGRAY);
         pdf.text('   No parts scanned for this bin.', MARGIN + 4, y + 4);
         y += 7;
       } else {
@@ -516,18 +482,10 @@ export function exportUsuiPDF(
               pdf.rect(MARGIN, rowY, COL_W, 5.5, 'F');
             }
           }
-
-          pdf.setFontSize(6.5);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setTextColor(...C.DARK);
-          const label = `${pIdx + 1}. ${safe(part.part_code)}`;
-          pdf.text(label, MARGIN + (colIdx * partColW) + 2, rowY + 4);
-
+          pdf.setFontSize(6.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...C.DARK);
+          pdf.text(`${pIdx + 1}. ${safe(part.part_code)}`, MARGIN + (colIdx * partColW) + 2, rowY + 4);
           colIdx++;
-          if (colIdx === 3) {
-            colIdx = 0;
-            rowY += 5.5;
-          }
+          if (colIdx === 3) { colIdx = 0; rowY += 5.5; }
         });
 
         if (colIdx !== 0) rowY += 5.5;
