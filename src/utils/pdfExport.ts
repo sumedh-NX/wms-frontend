@@ -12,7 +12,7 @@ const C = {
   ROW_HEAD: [230, 245, 210] as [number,number,number],
   RED:      [200,  50,  50] as [number,number,number],
   WHITE:    [255, 255, 255] as [number,number,number],
-  BG:       [ 248, 249, 250] as [number,number,number],
+  BG:       [248, 249, 250] as [number,number,number],
 };
 const PAGE_W = 210; // A4 mm
 const MARGIN = 12;
@@ -54,13 +54,6 @@ function kv(pdf: jsPDF, x: number, y: number, label: string, value: string): voi
   pdf.text(value, x, y + 4.5);
 }
 
-/** Draw a horizontal divider */
-function divider(pdf: jsPDF, y: number): number {
-  pdf.setDrawColor(220, 220, 220);
-  pdf.line(MARGIN, y, MARGIN + COL_W, y);
-  return y + 4;
-}
-
 /** Check and add new page if needed */
 function checkPage(pdf: jsPDF, y: number, needed = 12): number {
   if (y + needed > 282) {
@@ -83,6 +76,47 @@ function footer(pdf: jsPDF): void {
     );
     pdf.text(`Page ${i} of ${totalPages}`, PAGE_W - MARGIN - 20, 290);
   }
+}
+
+/** Draw 3 signature boxes: Scanned by | Confirmed By | Approved By */
+function drawSignatureBoxes(pdf: jsPDF, y: number): number {
+  y = checkPage(pdf, y, 42);
+  y += 8;
+
+  const gap  = 6;
+  const boxW = (COL_W - gap * 2) / 3;
+  const boxH = 28;
+  const labels = ['Scanned by', 'Confirmed By', 'Approved By'];
+
+  labels.forEach((label, i) => {
+    const x = MARGIN + i * (boxW + gap);
+
+    pdf.setFillColor(250, 250, 250);
+    pdf.setDrawColor(180, 180, 180);
+    pdf.roundedRect(x, y, boxW, boxH, 2, 2, 'FD');
+
+    // Label heading
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...C.DARK);
+    pdf.text(label, x + boxW / 2, y + 7, { align: 'center' });
+
+    // Thin line under heading
+    pdf.setDrawColor(210, 210, 210);
+    pdf.line(x + 3, y + 10, x + boxW - 3, y + 10);
+
+    // Signature line near bottom
+    pdf.setDrawColor(150, 150, 150);
+    pdf.line(x + 5, y + boxH - 6, x + boxW - 5, y + boxH - 6);
+
+    // Caption below line
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(...C.LGRAY);
+    pdf.text('Signature & Stamp', x + boxW / 2, y + boxH - 2, { align: 'center' });
+  });
+
+  return y + boxH + 6;
 }
 
 // ─────────────────────────────────────────────
@@ -108,15 +142,13 @@ function drawReportHeader(
 
   let y = 20;
 
-  // Determine dispatched at
-  const logTypes = customer === 'USUI' 
-    ? ['PART', 'NX_QR'] 
+  const logTypes = customer === 'USUI'
+    ? ['PART', 'NX_QR']
     : ['PICKLIST', 'BIN_LABEL'];
   const lastActionLog = logs.filter(l => logTypes.includes(l.type)).pop();
   const dispatchedAt = lastActionLog ? fmtDate(lastActionLog.created_at) : '—';
   const createdBy = logs.find(l => l.operator_name)?.operator_name || '—';
 
-  // Summary KV grid — 3 columns
   const col1 = MARGIN;
   const col2 = MARGIN + 62;
   const col3 = MARGIN + 124;
@@ -124,17 +156,16 @@ function drawReportHeader(
   pdf.setFillColor(...C.BG);
   pdf.roundedRect(MARGIN, y, COL_W, 28, 2, 2, 'F');
 
-  kv(pdf, col1 + 4, y + 6, 'DISPATCH NO', `DSP-${safe(dispatch?.dispatch_number)}`);
-  kv(pdf, col2,     y + 6, 'STATUS',       safe(dispatch?.status));
-  kv(pdf, col3,     y + 6, 'CUSTOMER',     customer);
+  kv(pdf, col1 + 4, y + 6,  'DISPATCH NO',    `DSP-${safe(dispatch?.dispatch_number)}`);
+  kv(pdf, col2,     y + 6,  'STATUS',          safe(dispatch?.status));
+  kv(pdf, col3,     y + 6,  'CUSTOMER',        customer);
 
-  kv(pdf, col1 + 4, y + 18, 'OPERATOR',     createdBy);
-  kv(pdf, col2,     y + 18, 'CREATED AT',   fmtDate(dispatch?.created_at));
-  kv(pdf, col3,     y + 18, 'DISPATCHED AT', dispatchedAt);
+  kv(pdf, col1 + 4, y + 18, 'OPERATOR',        createdBy);
+  kv(pdf, col2,     y + 18, 'CREATED AT',      fmtDate(dispatch?.created_at));
+  kv(pdf, col3,     y + 18, 'DISPATCHED AT',   dispatchedAt);
 
   y += 32;
 
-  // Second KV row
   pdf.setFillColor(...C.BG);
   pdf.roundedRect(MARGIN, y, COL_W, 14, 2, 2, 'F');
 
@@ -153,18 +184,16 @@ function drawAuditLog(pdf: jsPDF, y: number, logs: any[]): number {
   y = checkPage(pdf, y, 20);
   y = sectionHeader(pdf, y, 'Scan Audit Log');
 
-  // Column definitions
   const cols = [
-    { l: 'Timestamp',  x: MARGIN,      w: 36 },
-    { l: 'Type',       x: MARGIN + 37, w: 18 },
-    { l: 'Code',       x: MARGIN + 56, w: 38 },
-    { l: 'Product',    x: MARGIN + 95, w: 28 },
+    { l: 'Timestamp',  x: MARGIN,       w: 36 },
+    { l: 'Type',       x: MARGIN + 37,  w: 18 },
+    { l: 'Code',       x: MARGIN + 56,  w: 38 },
+    { l: 'Product',    x: MARGIN + 95,  w: 28 },
     { l: 'Result',     x: MARGIN + 124, w: 16 },
     { l: 'Operator',   x: MARGIN + 141, w: 30 },
     { l: 'Error',      x: MARGIN + 172, w: 26 },
   ];
 
-  // Header row
   pdf.setFillColor(...C.ROW_HEAD);
   pdf.rect(MARGIN, y, COL_W, 6, 'F');
   pdf.setFontSize(7);
@@ -196,10 +225,10 @@ function drawAuditLog(pdf: jsPDF, y: number, logs: any[]): number {
 
     const code = safe(log.code);
     const displayCode = code.length > 18 ? code.substring(0, 16) + '..' : code;
-    const error = log.error_message 
-      ? (log.error_message.length > 18 
-        ? log.error_message.substring(0, 16) + '..' 
-        : log.error_message) 
+    const error = log.error_message
+      ? (log.error_message.length > 18
+        ? log.error_message.substring(0, 16) + '..'
+        : log.error_message)
       : '—';
 
     const rowData = [
@@ -224,13 +253,13 @@ function drawAuditLog(pdf: jsPDF, y: number, logs: any[]): number {
 // NITERA PDF
 // ═══════════════════════════════════════════════════════
 export function exportNiteraPDF(
-  dispatch: any, 
-  logs: any[], 
-  bins: any[], 
+  dispatch: any,
+  logs: any[],
+  bins: any[],
   picks: any[]
 ): void {
   const pdf = new jsPDF('p', 'mm', 'a4');
-  let y = drawReportHeader(pdf, 'WMS Dispatch Report', dispatch, logs, 'Nitera');
+  let y = drawReportHeader(pdf, 'Scanning Chalan', dispatch, logs, 'Nitera');
 
   // ── Dispatch Summary ──
   y = checkPage(pdf, y, 20);
@@ -373,6 +402,9 @@ export function exportNiteraPDF(
   // ── Audit Log ──
   y = drawAuditLog(pdf, y, logs);
 
+  // ── Signature Boxes ──
+  y = drawSignatureBoxes(pdf, y);
+
   footer(pdf);
   pdf.save(`Nitera_Dispatch_${dispatch?.dispatch_number}.pdf`);
 }
@@ -381,13 +413,13 @@ export function exportNiteraPDF(
 // USUI PDF
 // ═══════════════════════════════════════════════════════
 export function exportUsuiPDF(
-  dispatch: any, 
-  logs: any[], 
-  bins: any[], 
+  dispatch: any,
+  logs: any[],
+  bins: any[],
   parts: any[]
 ): void {
   const pdf = new jsPDF('p', 'mm', 'a4');
-  let y = drawReportHeader(pdf, 'WMS Dispatch Report', dispatch, logs, 'USUI');
+  let y = drawReportHeader(pdf, 'Scanning Chalan', dispatch, logs, 'USUI');
 
   // ── Dispatch Summary ──
   y = checkPage(pdf, y, 20);
@@ -447,13 +479,11 @@ export function exportUsuiPDF(
     y += 10;
   } else {
     bins.forEach((bin, binIdx) => {
-      // Get parts for this bin
       const binParts = parts.filter((p: any) => p.bin_id === bin.id);
       const binComplete = binParts.length >= (dispatch?.ref_case_pack || 0);
 
       y = checkPage(pdf, y, 14);
 
-      // Bin header row
       pdf.setFillColor(binComplete ? 210 : 255, binComplete ? 240 : 230, binComplete ? 210 : 210);
       pdf.rect(MARGIN, y, COL_W, 8, 'F');
       pdf.setFontSize(7.5);
@@ -473,7 +503,6 @@ export function exportUsuiPDF(
         pdf.text('   No parts scanned for this bin.', MARGIN + 4, y + 4);
         y += 7;
       } else {
-        // Parts in 3-column layout to save space
         const partColW = COL_W / 3;
         let colIdx = 0;
         let rowY = y;
@@ -483,7 +512,6 @@ export function exportUsuiPDF(
             y = checkPage(pdf, rowY, 6);
             rowY = y;
             if (pIdx % 6 === 0 && pIdx > 0) {
-              // alternating row background every 2 rows
               pdf.setFillColor(...C.ROW_ALT);
               pdf.rect(MARGIN, rowY, COL_W, 5.5, 'F');
             }
@@ -502,12 +530,10 @@ export function exportUsuiPDF(
           }
         });
 
-        // If we ended mid-row, advance
         if (colIdx !== 0) rowY += 5.5;
         y = rowY + 3;
       }
 
-      // Small divider between bins
       if (binIdx < bins.length - 1) {
         pdf.setDrawColor(200, 200, 200);
         pdf.line(MARGIN, y, MARGIN + COL_W, y);
@@ -519,6 +545,9 @@ export function exportUsuiPDF(
 
   // ── Audit Log ──
   y = drawAuditLog(pdf, y, logs);
+
+  // ── Signature Boxes ──
+  y = drawSignatureBoxes(pdf, y);
 
   footer(pdf);
   pdf.save(`USUI_Dispatch_${dispatch?.dispatch_number}.pdf`);

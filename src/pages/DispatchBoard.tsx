@@ -69,7 +69,6 @@ export default function DispatchBoard() {
   };
 
   useEffect(() => {
-    // Serve cached list instantly on back-navigation, refresh silently in background
     const raw = sessionStorage.getItem(`dispatch_cache_${customerId}`);
     if (raw) {
       try {
@@ -150,7 +149,6 @@ export default function DispatchBoard() {
     <>
       <style>{KEYFRAMES}</style>
 
-      {/* Full-screen overlay while creating — prevents confusion on slow HHT connections */}
       {creating && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(13,13,48,0.93)',
@@ -165,12 +163,10 @@ export default function DispatchBoard() {
 
       <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#1B1B4B 0%,#12123a 50%,#0d0d30 100%)', fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#fff' }}>
 
-        {/* Grid background — skip on mobile, it's expensive on HHT */}
         {!isMobile && (
           <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(120,190,32,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(120,190,32,0.03) 1px,transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none', zIndex: 0 }} />
         )}
 
-        {/* Top bar — no backdrop-filter on mobile (expensive GPU op on HHT) */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 10,
           background: isMobile ? '#161640' : 'rgba(27,27,75,0.85)',
@@ -203,7 +199,6 @@ export default function DispatchBoard() {
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '16px 12px' : '28px 20px' }}>
 
-          {/* Title row */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', animation: 'fadeUp 0.4s ease both' }}>
             <div>
               <h1 style={{ color: '#fff', fontSize: isMobile ? '22px' : '26px', fontWeight: 700, margin: 0 }}>Dispatches</h1>
@@ -227,7 +222,6 @@ export default function DispatchBoard() {
             </button>
           </div>
 
-          {/* Date filter — wraps on mobile */}
           <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)', animation: 'fadeUp 0.4s ease 0.1s both' }}>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>Dispatch Date Range</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
@@ -249,12 +243,11 @@ export default function DispatchBoard() {
             </div>
           </div>
 
-          {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px', animation: 'fadeUp 0.4s ease 0.2s both' }}>
             {[
-              { label: 'Total', value: totalCount, color: 'rgba(255,255,255,0.08)', textColor: '#fff' },
-              { label: 'In Progress', value: inProgressCount, color: 'rgba(255,185,0,0.10)', textColor: '#e8a800' },
-              { label: 'Completed', value: completedCount, color: 'rgba(120,190,32,0.10)', textColor: '#78BE20' },
+              { label: 'Total',       value: totalCount,      color: 'rgba(255,255,255,0.08)', textColor: '#fff'    },
+              { label: 'In Progress', value: inProgressCount, color: 'rgba(255,185,0,0.10)',   textColor: '#e8a800' },
+              { label: 'Completed',   value: completedCount,  color: 'rgba(120,190,32,0.10)',  textColor: '#78BE20' },
             ].map(s => (
               <div key={s.label} style={{ background: s.color, border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: isMobile ? '12px 10px' : '16px' }}>
                 <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>{s.label}</div>
@@ -263,7 +256,6 @@ export default function DispatchBoard() {
             ))}
           </div>
 
-          {/* Status filter tabs */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', animation: 'fadeUp 0.4s ease 0.3s both' }}>
             {(['ALL', 'IN_PROGRESS', 'COMPLETED'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)} style={filterBtn(f)}>
@@ -272,7 +264,6 @@ export default function DispatchBoard() {
             ))}
           </div>
 
-          {/* List */}
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
               <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.15)', borderTop: '2px solid #78BE20', borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginRight: '12px' }} />
@@ -286,7 +277,6 @@ export default function DispatchBoard() {
             </div>
           ) : isMobile ? (
 
-            /* ── MOBILE CARD LAYOUT ── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filtered.map((d, i) => (
                 <div
@@ -296,7 +286,7 @@ export default function DispatchBoard() {
                     background: d.status === 'COMPLETED' ? 'rgba(120,190,32,0.07)' : 'rgba(255,255,255,0.05)',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderLeft: `4px solid ${d.status === 'COMPLETED' ? '#78BE20' : '#e8a800'}`,
-                    borderRadius: '12px', padding: '14px 14px', cursor: 'pointer',
+                    borderRadius: '12px', padding: '14px', cursor: 'pointer',
                     animation: `rowIn 0.25s ease ${i * 0.02}s both`,
                   }}
                 >
@@ -329,7 +319,6 @@ export default function DispatchBoard() {
 
           ) : (
 
-            /* ── DESKTOP TABLE LAYOUT ── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', padding: '0 18px 10px 18px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 <div style={{ width: '100px' }}>Dispatch #</div>
