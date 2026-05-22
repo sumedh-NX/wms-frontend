@@ -1,5 +1,3 @@
-$ cat /home/user/wms-frontend/src/pages/DispatchBoard.tsx
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
