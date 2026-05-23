@@ -40,8 +40,9 @@ const STEP_CFG = {
 };
 
 export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, onMessage }: UsuiWorkflowProps) {
-  const [step, setStep]             = useState<'NX' | 'BIN' | 'PART'>(dispatch?.ref_product_code ? 'BIN' : 'NX');
-  const [scanInput, setScanInput]   = useState('');
+  const [step, setStep]               = useState<'NX' | 'BIN' | 'PART'>(dispatch?.ref_product_code ? 'BIN' : 'NX');
+  const [scanInput, setScanInput]     = useState('');
+  const [submitting, setSubmitting]   = useState(false);
   const [scannedParts, setScannedParts] = useState<string[]>([]);
   const [requiredParts, setRequiredParts] = useState(0);
   const [currentBinId, setCurrentBinId] = useState<number | null>(null);
@@ -49,8 +50,10 @@ export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, o
   const cfg = STEP_CFG[step];
 
   const handleSubmit = async () => {
-    if (!scanInput.trim()) return;
+    if (!scanInput.trim() || submitting) return;
     const input = scanInput.trim();
+    setScanInput('');     // clear immediately so the scanner can queue the next scan
+    setSubmitting(true);
 
     try {
       let res: any;
@@ -72,22 +75,21 @@ export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, o
         res = await axios.post(`${import.meta.env.VITE_API_BASE}/dispatch/${dispatchId}/scan-part`, {
           rawQr: input, binId: currentBinId
         });
-        setTimeout(() => { if (res.data.dispatch) onDispatchUpdate(res.data.dispatch); }, 100);
+        if (res.data.dispatch) onDispatchUpdate(res.data.dispatch);
         setScannedParts(prev => [...prev, res.data.partCode]);
 
         if (res.data.count >= requiredParts) {
           onMessage({ type: 'success', text: 'Bin complete! Scan next Bin.' });
           setStep('BIN');
-          setScanInput('');
           return;
         }
       }
 
-      setScanInput('');
       onMessage({ type: 'success', text: 'Scan accepted' });
     } catch (err: any) {
       onMessage({ type: 'error', text: err.response?.data?.message || 'Scan failed' });
-      setScanInput('');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -194,15 +196,17 @@ export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, o
         <div style={{ padding: '12px 16px', display: 'flex', gap: '8px' }}>
           <input
             autoFocus type="text"
-            placeholder={cfg.placeholder}
+            placeholder={submitting ? 'Processing...' : cfg.placeholder}
             value={scanInput}
             onChange={e => setScanInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            disabled={submitting}
             style={{
               flex: 1, padding: '12px 14px',
-              background: 'rgba(0,0,0,0.22)',
+              background: submitting ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.22)',
               border: `1.5px solid ${cfg.border}`,
               borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none',
+              opacity: submitting ? 0.6 : 1,
             }}
           />
           <button

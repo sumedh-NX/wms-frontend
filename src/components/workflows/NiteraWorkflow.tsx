@@ -31,7 +31,8 @@ const STEP_CFG = {
 };
 
 export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate, onMessage }: NiteraWorkflowProps) {
-  const [scanInput, setScanInput] = useState('');
+  const [scanInput, setScanInput]   = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
   const cfg = showBin ? STEP_CFG.BIN : STEP_CFG.PICK;
@@ -41,8 +42,10 @@ export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate,
     : `${dispatch?.bin_qty ?? 0} / ${dispatch?.total_schedule_bins ?? '—'} picks`;
 
   const handleSubmit = async () => {
-    if (!scanInput.trim()) return;
+    if (!scanInput.trim() || submitting) return;
     const input = scanInput.trim();
+    setScanInput('');     // clear immediately so the scanner can queue the next scan
+    setSubmitting(true);
     try {
       const endpoint = showBin ? 'scan-bin' : 'scan-pick';
       const res = await axios.post(
@@ -51,10 +54,10 @@ export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate,
       );
       if (res.data) onDispatchUpdate(res.data);
       onMessage({ type: 'success', text: `${showBin ? 'Bin' : 'Pick'} accepted` });
-      setScanInput('');
     } catch (err: any) {
       onMessage({ type: 'error', text: err.response?.data?.message || 'Scan failed' });
-      setScanInput('');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -114,15 +117,17 @@ export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate,
       <div style={{ padding: '10px 16px', display: 'flex', gap: '8px' }}>
         <input
           autoFocus type="text"
-          placeholder={cfg.placeholder}
+          placeholder={submitting ? 'Processing...' : cfg.placeholder}
           value={scanInput}
           onChange={e => setScanInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          disabled={submitting}
           style={{
             flex: 1, padding: '12px 14px',
-            background: 'rgba(0,0,0,0.22)',
+            background: submitting ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.22)',
             border: `1.5px solid ${cfg.border}`,
             borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none',
+            opacity: submitting ? 0.6 : 1,
           }}
         />
         <button
