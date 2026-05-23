@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import CameraScanner from '../CameraScanner';
 
@@ -46,7 +46,10 @@ export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, o
   const [scannedParts, setScannedParts] = useState<string[]>([]);
   const [requiredParts, setRequiredParts] = useState(0);
   const [currentBinId, setCurrentBinId] = useState<number | null>(null);
-
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!submitting) inputRef.current?.focus();
+  }, [step, submitting]);
   const cfg = STEP_CFG[step];
 
   const handleSubmit = async () => {
@@ -195,6 +198,7 @@ export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, o
         {/* Input */}
         <div style={{ padding: '12px 16px', display: 'flex', gap: '8px' }}>
           <input
+            ref={inputRef}
             autoFocus type="text"
             placeholder={submitting ? 'Processing...' : cfg.placeholder}
             value={scanInput}

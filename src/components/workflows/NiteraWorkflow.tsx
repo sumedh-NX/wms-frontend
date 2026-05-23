@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import CameraScanner from '../CameraScanner';
 
@@ -33,8 +33,13 @@ const STEP_CFG = {
 export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate, onMessage }: NiteraWorkflowProps) {
   const [scanInput, setScanInput]   = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const showBin = !dispatch || dispatch.smg_qty <= dispatch.bin_qty;
+
+  useEffect(() => {
+    if (!submitting) inputRef.current?.focus();
+  }, [showBin, submitting]);
   const cfg = showBin ? STEP_CFG.BIN : STEP_CFG.PICK;
 
   const counter = showBin
@@ -116,6 +121,7 @@ export default function NiteraWorkflow({ dispatchId, dispatch, onDispatchUpdate,
       {/* Input */}
       <div style={{ padding: '10px 16px', display: 'flex', gap: '8px' }}>
         <input
+          ref={inputRef}
           autoFocus type="text"
           placeholder={submitting ? 'Processing...' : cfg.placeholder}
           value={scanInput}

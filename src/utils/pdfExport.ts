@@ -311,9 +311,7 @@ function drawReportHeader(pdf: jsPDF, dispatch: any, logs: any[], customer: stri
   let y = 26;
 
   // ── Info boxes ──
-  const logTypes = customer === 'USUI' ? ['PART', 'NX_QR'] : ['PICKLIST', 'BIN_LABEL'];
-  const lastPassLog = logs.filter(l => logTypes.includes(l.type) && l.result === 'PASS').pop();
-  const dispatchedAt = lastPassLog ? fmtDate(lastPassLog.created_at) : '—';
+  const dispatchedAt = dispatch?.status === 'COMPLETED' ? fmtDate(dispatch.updated_at) : '—';
   const createdBy = logs.find(l => l.operator_name)?.operator_name || '—';
 
   const col1 = MARGIN + 4, col2 = MARGIN + 64, col3 = MARGIN + 126;

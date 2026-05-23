@@ -18,6 +18,11 @@ function formatDate(iso: string) {
     ' · ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
+function dispatchedDate(d: any) {
+  if (d.status !== 'COMPLETED') return '—';
+  return formatDate(d.updated_at);
+}
+
 export default function DispatchBoard() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
@@ -332,7 +337,7 @@ export default function DispatchBoard() {
                       <div style={{ color: '#fff', fontSize: '13px', fontWeight: 700 }}>{d.total_schedule_bins ?? '—'}</div>
                     </div>
                   </div>
-                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>{formatDate(d.created_at)}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Dispatched: {dispatchedDate(d)}</div>
                 </div>
               ))}
             </div>
@@ -346,7 +351,7 @@ export default function DispatchBoard() {
                 <div style={{ flex: 1 }}>Sched No</div>
                 <div style={{ width: '120px' }}>Nagare Time</div>
                 <div style={{ width: '100px', textAlign: 'center' }}>Sched Bins</div>
-                <div style={{ width: '150px' }}>Dispatch Date</div>
+                <div style={{ width: '150px' }}>Dispatched</div>
                 <div style={{ width: '100px', textAlign: 'right' }}>Status</div>
               </div>
               {filtered.map((d, i) => (
@@ -373,7 +378,7 @@ export default function DispatchBoard() {
                     <div style={{ flex: 1, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{d.ref_schedule_number || '—'}</div>
                     <div style={{ width: '120px', color: '#78BE20', fontSize: '13px', fontWeight: 600 }}>{d.ref_supply_date || '—'}</div>
                     <div style={{ width: '100px', textAlign: 'center', color: '#fff', fontSize: '13px', fontWeight: 600 }}>{d.total_schedule_bins ?? '—'}</div>
-                    <div style={{ width: '150px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{formatDate(d.created_at)}</div>
+                    <div style={{ width: '150px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{dispatchedDate(d)}</div>
                     <div style={{ width: '100px', textAlign: 'right' }}><div style={statusBadge(d.status)}>{d.status === 'COMPLETED' ? 'Completed' : 'In Progress'}</div></div>
                   </div>
                 </div>
