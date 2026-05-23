@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useIdleTimer } from '../hooks/useIdleTimer';
-import { getCustomerPlugin } from '../customers/registry';
+import NiteraWorkflow from '../components/workflows/NiteraWorkflow';
+import UsuiWorkflow from '../components/workflows/UsuiWorkflow';
+import { exportNiteraPDF, exportUsuiPDF } from '../utils/pdfExport';
 import axios from 'axios';
 
 const KEYFRAMES = `
@@ -27,9 +29,8 @@ export default function DispatchScreen() {
   const [strategyCode, setStrategyCode] = useState('');
   const [message, setMessage]           = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
-  const plugin      = strategyCode ? getCustomerPlugin(strategyCode) : null;
-  const isComplete  = dispatch?.status === 'COMPLETED';
-  const displayCustomer = customerName || plugin?.displayName || strategyCode || '—';
+  const isUsui     = strategyCode === 'USUI_1toMany';
+  const isComplete = dispatch?.status === 'COMPLETED';
 
   const loadDispatch = async () => {
     try {
@@ -39,7 +40,8 @@ export default function DispatchScreen() {
       setBins(res.data.bins   || []);
       setPicks(res.data.picks || []);
       setParts(res.data.parts || []);
-      setStrategyCode(res.data.dispatch?.strategy_code || '');
+      const code = res.data.dispatch?.strategy_code || '';
+      setStrategyCode(code);
     } catch (e) {
       console.error(e);
     } finally {
@@ -55,20 +57,24 @@ export default function DispatchScreen() {
   }, 10 * 60 * 1000);
 
   const handleExportPDF = async () => {
-    if (!dispatch || exporting || !plugin) return;
+    if (!dispatch || exporting) return;
     setExporting(true);
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_BASE}/dispatch/${id}`);
-      plugin.exportPDF(
-        res.data.dispatch,
-        res.data.logs   || [],
-        res.data.bins   || [],
-        res.data.picks  || [],
-        res.data.parts  || []
-      );
+      const freshDispatch = res.data.dispatch;
+      const freshLogs     = res.data.logs   || [];
+      const freshBins     = res.data.bins   || [];
+      const freshPicks    = res.data.picks  || [];
+      const freshParts    = res.data.parts  || [];
+      if (isUsui) {
+        exportUsuiPDF(freshDispatch, freshLogs, freshBins, freshParts);
+      } else {
+        exportNiteraPDF(freshDispatch, freshLogs, freshBins, freshPicks);
+      }
     } catch (e) {
       console.error('PDF export error:', e);
-      plugin.exportPDF(dispatch, logs, bins, picks, parts);
+      if (isUsui) exportUsuiPDF(dispatch, logs, bins, parts);
+      else exportNiteraPDF(dispatch, logs, bins, picks);
     } finally {
       setExporting(false);
     }
@@ -88,6 +94,8 @@ export default function DispatchScreen() {
   const progress = dispatch.total_schedule_bins > 0
     ? Math.round((dispatch.smg_qty / dispatch.total_schedule_bins) * 100)
     : 0;
+
+  const displayCustomer = customerName || (isUsui ? 'USUI' : 'Nitera');
 
   return (
     <>
@@ -114,16 +122,19 @@ export default function DispatchScreen() {
                 WMS Outbound
               </div>
             </div>
-            <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.12)', margin: '0 4px', flexShrink: 0 }} />
-            <div style={{
-              background: 'rgba(120,190,32,0.15)',
-              border: '1px solid rgba(120,190,32,0.4)',
-              borderRadius: '8px', padding: '4px 10px',
-              color: '#78BE20', fontSize: '13px', fontWeight: 700,
-              whiteSpace: 'nowrap',
-            }}>
-              {displayCustomer}
-            </div>
+            {/* Customer name badge */}
+            <>
+              <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.12)', margin: '0 4px', flexShrink: 0 }} />
+              <div style={{
+                background: 'rgba(120,190,32,0.15)',
+                border: '1px solid rgba(120,190,32,0.4)',
+                borderRadius: '8px', padding: '4px 10px',
+                color: '#78BE20', fontSize: '13px', fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}>
+                {displayCustomer}
+              </div>
+            </>
           </div>
           <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
             Back
@@ -196,11 +207,11 @@ export default function DispatchScreen() {
                 </div>
                 <div style={{ color: '#78BE20', fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>Batch Complete!</div>
                 <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '28px' }}>
-                  All bins and items scanned successfully
+                  All {isUsui ? 'bins and parts' : 'bins and picks'} scanned successfully
                 </div>
                 <button
                   onClick={handleExportPDF}
-                  disabled={exporting || !plugin}
+                  disabled={exporting}
                   style={{
                     padding: '12px 32px', borderRadius: '10px',
                     border: '1px solid rgba(120,190,32,0.5)',
@@ -217,19 +228,10 @@ export default function DispatchScreen() {
             </div>
           ) : (
             <>
-              {plugin ? (
-                <plugin.Workflow
-                  dispatchId={id!}
-                  dispatch={dispatch}
-                  onDispatchUpdate={setDispatch}
-                  onMessage={setMessage}
-                />
+              {isUsui ? (
+                <UsuiWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={setMessage} />
               ) : (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: '14px' }}>
-                  {strategyCode
-                    ? `No workflow registered for strategy: ${strategyCode}`
-                    : 'Loading workflow...'}
-                </div>
+                <NiteraWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={setMessage} />
               )}
             </>
           )}
