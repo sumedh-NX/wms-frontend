@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useIdleTimer } from '../hooks/useIdleTimer';
 import NiteraWorkflow from '../components/workflows/NiteraWorkflow';
@@ -28,9 +28,18 @@ export default function DispatchScreen() {
   const [exporting, setExporting]       = useState(false);
   const [strategyCode, setStrategyCode] = useState('');
   const [message, setMessage]           = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const successTimerRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isUsui     = strategyCode === 'USUI_1toMany';
   const isComplete = dispatch?.status === 'COMPLETED';
+
+  const showMessage = (msg: { type: 'error' | 'success'; text: string }) => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    setMessage(msg);
+    if (msg.type === 'success') {
+      successTimerRef.current = setTimeout(() => setMessage(null), 1500);
+    }
+  };
 
   const loadDispatch = async () => {
     try {
@@ -122,7 +131,6 @@ export default function DispatchScreen() {
                 WMS Outbound
               </div>
             </div>
-            {/* Customer name badge */}
             <>
               <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.12)', margin: '0 4px', flexShrink: 0 }} />
               <div style={{
@@ -229,9 +237,9 @@ export default function DispatchScreen() {
           ) : (
             <>
               {isUsui ? (
-                <UsuiWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={setMessage} />
+                <UsuiWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
               ) : (
-                <NiteraWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={setMessage} />
+                <NiteraWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
               )}
             </>
           )}
