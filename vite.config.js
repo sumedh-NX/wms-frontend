@@ -21,7 +21,8 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/',               // <--- CHANGE THIS TO ROOT fro TEST AND LOCAL,
+  //base: '/',               // <--- CHANGE THIS TO ROOT fro TEST AND LOCAL,
+  base: process.env.NODE_ENV === 'production' ? '/wms-frontend/' : '/',
   build: {
     chunkSizeWarningLimit: 1000,
   },
