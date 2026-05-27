@@ -27,7 +27,7 @@ axios.interceptors.response.use(
       console.error(`SESSION EXPIRED: [${method}] ${url}`);
       localStorage.removeItem('token');
       if (!window.location.hash.includes('/login')) {
-        window.location.href = window.location.origin + '/#/login';
+        window.location.href = window.location.origin + import.meta.env.BASE_URL + '#/login';
       }
     } else if (status === 403) {
       console.error(`PERMISSION DENIED: [${method}] ${url}`);
