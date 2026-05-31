@@ -3,7 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useIdleTimer } from '../hooks/useIdleTimer';
 import NiteraWorkflow from '../components/workflows/NiteraWorkflow';
 import UsuiWorkflow from '../components/workflows/UsuiWorkflow';
-import { exportNiteraPDF, exportUsuiPDF } from '../utils/pdfExport';
+import NhkWorkflow from '../components/workflows/NhkWorkflow';
+import { exportNiteraPDF, exportUsuiPDF, exportNhkPDF } from '../utils/pdfExport';
 import axios from 'axios';
 
 const KEYFRAMES = `
@@ -30,7 +31,9 @@ export default function DispatchScreen() {
   const [message, setMessage]           = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const successTimerRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isUsui     = strategyCode === 'USUI_1toMany';
+  const isUsui = strategyCode === 'USUI_1toMany';
+  const isNhk  = strategyCode === 'NHKS_1toMany';
+
   const isComplete = dispatch?.status === 'COMPLETED';
 
   const showMessage = (msg: { type: 'error' | 'success'; text: string }) => {
@@ -75,14 +78,17 @@ export default function DispatchScreen() {
       const freshBins     = res.data.bins   || [];
       const freshPicks    = res.data.picks  || [];
       const freshParts    = res.data.parts  || [];
-      if (isUsui) {
+      if (isNhk) {
+        exportNhkPDF(freshDispatch, freshLogs, freshBins, freshParts);
+      } else if (isUsui) {
         exportUsuiPDF(freshDispatch, freshLogs, freshBins, freshParts);
       } else {
         exportNiteraPDF(freshDispatch, freshLogs, freshBins, freshPicks);
       }
     } catch (e) {
       console.error('PDF export error:', e);
-      if (isUsui) exportUsuiPDF(dispatch, logs, bins, parts);
+      if (isNhk) exportNhkPDF(dispatch, logs, bins, parts);
+      else if (isUsui) exportUsuiPDF(dispatch, logs, bins, parts);
       else exportNiteraPDF(dispatch, logs, bins, picks);
     } finally {
       setExporting(false);
@@ -104,7 +110,7 @@ export default function DispatchScreen() {
     ? Math.round((dispatch.smg_qty / dispatch.total_schedule_bins) * 100)
     : 0;
 
-  const displayCustomer = customerName || (isUsui ? 'USUI' : 'Nitera');
+  const displayCustomer = customerName || (isNhk ? 'NHK SPRINGS' : isUsui ? 'USUI' : 'Nitera');
 
   return (
     <>
@@ -215,7 +221,7 @@ export default function DispatchScreen() {
                 </div>
                 <div style={{ color: '#78BE20', fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>Batch Complete!</div>
                 <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '28px' }}>
-                  All {isUsui ? 'bins and parts' : 'bins and picks'} scanned successfully
+                  All {isUsui || isNhk ? 'bins and parts' : 'bins and picks'} scanned successfully
                 </div>
                 <button
                   onClick={handleExportPDF}
@@ -236,7 +242,9 @@ export default function DispatchScreen() {
             </div>
           ) : (
             <>
-              {isUsui ? (
+              {isNhk ? (
+                <NhkWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
+              ) : isUsui ? (
                 <UsuiWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
               ) : (
                 <NiteraWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
