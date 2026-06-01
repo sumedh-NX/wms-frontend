@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ChangeEvent, type KeyboardEvent } from 'react';
 import axios from 'axios';
 import CameraScanner from '../CameraScanner';
 
@@ -47,7 +47,14 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
   const [submitting, setSubmitting]     = useState(false);
   const [scannedParts, setScannedParts] = useState<string[]>([]);
   const [currentBinId, setCurrentBinId] = useState<number | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // BIN QR is multiline (27 lines). Hardware scanners send each line then an Enter,
+  // so a plain <input type="text"> receives only one line before the first Enter fires.
+  // We accumulate lines here across Enter presses, then submit the full QR after a
+  // short idle period.
+  const accumRef  = useRef(''); // lines committed by Enter so far
+  const latestRef = useRef(''); // mirror of scanInput — avoids stale-closure reads
 
   useEffect(() => {
     if (!submitting) inputRef.current?.focus();
@@ -56,8 +63,18 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
   const cfg = STEP_CFG[step];
 
   const handleSubmit = async () => {
-    if (!scanInput.trim() || submitting) return;
-    const input = scanInput.trim();
+    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+
+    // For BIN: join all accumulated lines + whatever remains in the input field.
+    // For NX / PART: single-line, just use the current input value.
+    const raw = step === 'BIN'
+      ? (accumRef.current + latestRef.current).trim()
+      : latestRef.current.trim();
+
+    accumRef.current  = '';
+    latestRef.current = '';
+
+    if (!raw || submitting) return;
     setScanInput('');
     setSubmitting(true);
 
@@ -67,7 +84,7 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
       if (step === 'NX') {
         res = await axios.post(
           `${import.meta.env.VITE_API_BASE}/dispatch/${dispatchId}/scan-nx-nhk`,
-          { rawQr: input }
+          { rawQr: raw }
         );
         if (res.data.dispatch) onDispatchUpdate(res.data.dispatch);
         setStep('BIN');
@@ -75,7 +92,7 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
       } else if (step === 'BIN') {
         res = await axios.post(
           `${import.meta.env.VITE_API_BASE}/dispatch/${dispatchId}/scan-bin-nhk`,
-          { rawQr: input }
+          { rawQr: raw }
         );
         if (res.data.dispatch) onDispatchUpdate(res.data.dispatch);
         setCurrentBinId(res.data.binId);
@@ -85,7 +102,7 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
       } else if (step === 'PART') {
         res = await axios.post(
           `${import.meta.env.VITE_API_BASE}/dispatch/${dispatchId}/scan-part-nhk`,
-          { rawQr: input, binId: currentBinId }
+          { rawQr: raw, binId: currentBinId }
         );
         if (res.data.dispatch) onDispatchUpdate(res.data.dispatch);
         setScannedParts(prev => [...prev, res.data.partCode]);
@@ -103,6 +120,41 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setScanInput(val);
+    latestRef.current = val;
+    if (step === 'BIN') {
+      // Reschedule submit — handles the case where the scanner sends no trailing Enter
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(handleSubmit, 300);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    if (step === 'BIN') {
+      // Each Enter from the scanner = a line break inside the multiline QR.
+      // Append the current line to the accumulator, clear the visible input, and
+      // restart the idle timer. When no new input arrives for 200 ms, submit fires.
+      e.preventDefault();
+      accumRef.current  += latestRef.current + '\n';
+      latestRef.current  = '';
+      setScanInput('');
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(handleSubmit, 200);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handleClear = () => {
+    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+    accumRef.current  = '';
+    latestRef.current = '';
+    setScanInput('');
   };
 
   return (
@@ -194,8 +246,8 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
             ref={inputRef} autoFocus type="text"
             placeholder={submitting ? 'Processing...' : cfg.placeholder}
             value={scanInput}
-            onChange={e => setScanInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
             disabled={submitting}
             style={{
               flex: 1, padding: '12px 14px',
@@ -206,7 +258,7 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
             }}
           />
           <button
-            onClick={() => setScanInput('')}
+            onClick={handleClear}
             style={{
               padding: '0 14px', background: 'rgba(255,255,255,0.06)',
               border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px',
@@ -215,7 +267,7 @@ export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, on
           >✕</button>
         </div>
         <div style={{ padding: '0 16px 16px' }}>
-          <CameraScanner onScan={txt => setScanInput(txt)} />
+          <CameraScanner onScan={txt => { accumRef.current = ''; latestRef.current = txt; setScanInput(txt); handleSubmit(); }} />
         </div>
       </div>
 
