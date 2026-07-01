@@ -23,7 +23,7 @@ export default defineConfig({
   plugins: [react()],
   //base: '/',               // <--- CHANGE THIS TO ROOT for TEST AND LOCAL,
   //base: process.env.NODE_ENV === 'production' ? '/wms-frontend/' : '/',
-  base: '/wms-frontend/'
+  base: '/wms-frontend/',  // <--- CHANGE THIS TO SUBFOLDER for PRODUCTION (GitHub Pages)
   build: {
     chunkSizeWarningLimit: 1000,
   },
