@@ -5,6 +5,8 @@ import CameraScanner from '../CameraScanner';
 interface UsuiWorkflowProps {
   dispatchId: string;
   dispatch: any;
+  bins: any[];
+  parts: any[];
   onDispatchUpdate: (dispatch: any) => void;
   onMessage: (msg: { type: 'error' | 'success'; text: string }) => void;
 }
@@ -39,13 +41,32 @@ const STEP_CFG = {
   },
 };
 
-export default function UsuiWorkflow({ dispatchId, dispatch, onDispatchUpdate, onMessage }: UsuiWorkflowProps) {
-  const [step, setStep]               = useState<'NX' | 'BIN' | 'PART'>(dispatch?.ref_product_code ? 'BIN' : 'NX');
-  const [scanInput, setScanInput]     = useState('');
-  const [submitting, setSubmitting]   = useState(false);
-  const [scannedParts, setScannedParts] = useState<string[]>([]);
-  const [requiredParts, setRequiredParts] = useState(0);
-  const [currentBinId, setCurrentBinId] = useState<number | null>(null);
+// Reconstructs where the operator actually left off (survives page reload / navigation
+// away and back) instead of always defaulting to NX/BIN. `bins`/`parts` come straight
+// from GET /api/dispatch/:id, which already persists everything needed for this.
+// Unlike NHK, USUI's required-parts count is per-bin (`case_pack`), not a fixed constant.
+function deriveInitialUsuiState(dispatch: any, bins: any[], parts: any[]) {
+  if (!dispatch?.ref_product_code) {
+    return { step: 'NX' as const, currentBinId: null as number | null, requiredParts: 0, scannedParts: [] as string[] };
+  }
+  const lastBin = bins.length > 0 ? bins[bins.length - 1] : null;
+  if (lastBin) {
+    const partsForBin = parts.filter((p: any) => p.bin_id === lastBin.id).map((p: any) => p.part_code);
+    if (partsForBin.length < lastBin.case_pack) {
+      return { step: 'PART' as const, currentBinId: lastBin.id as number, requiredParts: lastBin.case_pack, scannedParts: partsForBin };
+    }
+  }
+  return { step: 'BIN' as const, currentBinId: null as number | null, requiredParts: 0, scannedParts: [] as string[] };
+}
+
+export default function UsuiWorkflow({ dispatchId, dispatch, bins, parts, onDispatchUpdate, onMessage }: UsuiWorkflowProps) {
+  const [initialState]                    = useState(() => deriveInitialUsuiState(dispatch, bins, parts));
+  const [step, setStep]                   = useState<'NX' | 'BIN' | 'PART'>(initialState.step);
+  const [scanInput, setScanInput]         = useState('');
+  const [submitting, setSubmitting]       = useState(false);
+  const [scannedParts, setScannedParts]   = useState<string[]>(initialState.scannedParts);
+  const [requiredParts, setRequiredParts] = useState(initialState.requiredParts);
+  const [currentBinId, setCurrentBinId]   = useState<number | null>(initialState.currentBinId);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!submitting) inputRef.current?.focus();

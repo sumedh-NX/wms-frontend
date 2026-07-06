@@ -243,9 +243,9 @@ export default function DispatchScreen() {
           ) : (
             <>
               {isNhk ? (
-                <NhkWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
+                <NhkWorkflow dispatchId={id!} dispatch={dispatch} bins={bins} parts={parts} onDispatchUpdate={setDispatch} onMessage={showMessage} />
               ) : isUsui ? (
-                <UsuiWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
+                <UsuiWorkflow dispatchId={id!} dispatch={dispatch} bins={bins} parts={parts} onDispatchUpdate={setDispatch} onMessage={showMessage} />
               ) : (
                 <NiteraWorkflow dispatchId={id!} dispatch={dispatch} onDispatchUpdate={setDispatch} onMessage={showMessage} />
               )}

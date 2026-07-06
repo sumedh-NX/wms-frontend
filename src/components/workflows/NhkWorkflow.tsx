@@ -5,6 +5,8 @@ import CameraScanner from '../CameraScanner';
 interface NhkWorkflowProps {
   dispatchId: string;
   dispatch: any;
+  bins: any[];
+  parts: any[];
   onDispatchUpdate: (dispatch: any) => void;
   onMessage: (msg: { type: 'error' | 'success'; text: string }) => void;
 }
@@ -41,12 +43,30 @@ const STEP_CFG = {
   },
 };
 
-export default function NhkWorkflow({ dispatchId, dispatch, onDispatchUpdate, onMessage }: NhkWorkflowProps) {
-  const [step, setStep]                 = useState<'NX' | 'BIN' | 'PART'>(dispatch?.ref_product_code ? 'BIN' : 'NX');
+// Reconstructs where the operator actually left off (survives page reload / navigation
+// away and back) instead of always defaulting to NX/BIN. `bins`/`parts` come straight
+// from GET /api/dispatch/:id, which already persists everything needed for this.
+function deriveInitialNhkState(dispatch: any, bins: any[], parts: any[]) {
+  if (!dispatch?.ref_product_code) {
+    return { step: 'NX' as const, currentBinId: null as number | null, scannedParts: [] as string[] };
+  }
+  const lastBin = bins.length > 0 ? bins[bins.length - 1] : null;
+  if (lastBin) {
+    const partsForBin = parts.filter((p: any) => p.bin_id === lastBin.id).map((p: any) => p.part_code);
+    if (partsForBin.length < PARTS_PER_BIN) {
+      return { step: 'PART' as const, currentBinId: lastBin.id as number, scannedParts: partsForBin };
+    }
+  }
+  return { step: 'BIN' as const, currentBinId: null as number | null, scannedParts: [] as string[] };
+}
+
+export default function NhkWorkflow({ dispatchId, dispatch, bins, parts, onDispatchUpdate, onMessage }: NhkWorkflowProps) {
+  const [initialState]                  = useState(() => deriveInitialNhkState(dispatch, bins, parts));
+  const [step, setStep]                 = useState<'NX' | 'BIN' | 'PART'>(initialState.step);
   const [scanInput, setScanInput]       = useState('');
   const [submitting, setSubmitting]     = useState(false);
-  const [scannedParts, setScannedParts] = useState<string[]>([]);
-  const [currentBinId, setCurrentBinId] = useState<number | null>(null);
+  const [scannedParts, setScannedParts] = useState<string[]>(initialState.scannedParts);
+  const [currentBinId, setCurrentBinId] = useState<number | null>(initialState.currentBinId);
   const inputRef    = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // BIN QR is multiline (27 lines). Hardware scanners send each line then an Enter,
