@@ -4,7 +4,6 @@ import UserManagement from '../components/admin/UserManagement';
 import CustomerManagement from '../components/admin/CustomerManagement';
 import StrategyManagement from '../components/admin/StrategyManagement'; // IMPORTED
 import StrategyAssignment from '../components/admin/StrategyAssignment'; // IMPORTED
-import ItemMasterManagement from '../components/admin/ItemMasterManagement';
 
 const KEYFRAMES = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
@@ -23,7 +22,6 @@ export default function AdminPage() {
   const tabs = [
     { id: 'users', label: 'Staff Management' },
     { id: 'customers', label: 'Customer Master' },
-    { id: 'items', label: 'Item Master' },
     { id: 'strategies', label: 'Validation Strategies' },
     { id: 'assignments', label: 'Strategy Assignments' },
   ];
@@ -33,14 +31,14 @@ export default function AdminPage() {
       <style>{KEYFRAMES}</style>
       <div style={page}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-
+          
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button
-                onClick={() => navigate('/')}
-                style={{
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px',
+              <button 
+                onClick={() => navigate('/')} 
+                style={{ 
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', 
+                  borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', 
                   padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s'
                 }}
                 onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
@@ -57,10 +55,10 @@ export default function AdminPage() {
 
           <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1px' }}>
             {tabs.map(tab => (
-              <button
-                key={tab.id}
+              <button 
+                key={tab.id} 
                 onClick={() => setActiveTab(tab.id)}
-                style={{
+                style={{ 
                   padding: '12px 20px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600,
                   background: activeTab === tab.id ? '#78BE20' : 'transparent',
                   color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.4)',
@@ -77,7 +75,6 @@ export default function AdminPage() {
             {/* FIXED: Replaced placeholders with actual components */}
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'customers' && <CustomerManagement />}
-            {activeTab === 'items' && <ItemMasterManagement />}
             {activeTab === 'strategies' && <StrategyManagement />}
             {activeTab === 'assignments' && <StrategyAssignment />}
           </div>
