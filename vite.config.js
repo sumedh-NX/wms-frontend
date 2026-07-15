@@ -21,8 +21,8 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/',               // <--- CHANGE THIS TO ROOT for TEST AND LOCAL,
-  //base: '/wms-frontend/',  // <--- CHANGE THIS TO SUBFOLDER for PRODUCTION (GitHub Pages)
+  //base: '/',               // <--- CHANGE THIS TO ROOT for TEST AND LOCAL,
+  base: '/wms-frontend/',  // <--- CHANGE THIS TO SUBFOLDER for PRODUCTION (GitHub Pages)
   build: {
     chunkSizeWarningLimit: 1000,
   },
